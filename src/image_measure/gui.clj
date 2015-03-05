@@ -6,13 +6,18 @@
             [seesaw.color :as sclr]
             [seesaw.graphics :as sg]
             [seesaw.behave :as behave])
-  (:import [javax.swing JFrame JPanel ImageIcon]))
+  (:import [javax.swing JFrame JPanel ImageIcon]
+           [java.awt.geom Line2D]))
 
 (def colors [:black :white :red :blue :yellow :green :orange :purple nil])
 
 (def state (atom {
-  ;; can have lines or polygons that are sequences of lines 
+  ;; can have lines or polygons that are sequences of lines
   ;; so any line in a poly is also in lines
+
+  ;; lines [[Line2D graphics.Style] ..]
+  ;; graphics.Style {:foreground <Color> :background <Color>
+  ;;                 :stroke <Stroke> :font}
   :lines []
   :polygons []
   :style  (sg/style :color :black :stroke nil) }))
@@ -20,6 +25,19 @@
 (defn print-state
   ([] (pprint @state))
   ([k] (pprint (@state k))))
+
+(defn draw-point
+  ([x y r g style]
+    (sg/draw g (sg/circle x y r) style)))
+
+(defn draw-line-end-points [line2d style g]
+  (let [p1 (.getP1 line2d)
+        p2 (.getP2 line2d)
+        color (:foreground style)
+        line-width (.getLineWidth (:stroke style))]
+    (prn "line-width: " line-width ", p1: " p1)
+    (draw-point (.x p1) (.y p1) line-width g style)
+    (draw-point (.x p2) (.y p2) line-width g style)))
 
 ;; good for sanity checks
 (defn draw-a-red-x
@@ -44,7 +62,7 @@
 
 (defn start-new-line [state e]
   (let [p (.getPoint e)]
-    (log/info "state: " state)
+;    (log/info "state: " state)
     (assoc state
            :start-point [(.x p) (.y p)]
            :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
@@ -52,12 +70,12 @@
 (defn drag-new-line [state e [dx dy]]
   (let [p (.getPoint e)
         [start-x start-y] (:start-point state)]
-    (assoc state :current-line 
+    (assoc state :current-line
            [(sg/line start-x start-y (.x p) (.y p)) (:style state)])))
 
 (defn finish-new-line [state e]
   (do
-    (log/info "state: " state)
+;    (log/info "state: " state)
     (-> state
       (update-in [:lines] conj (:current-line state))
       (assoc :current-line nil))))
@@ -72,7 +90,7 @@
     (when handler
 ;      (println "dispatch:")
 ;      (println "event: " event "\nargs: " args)
-      (log/debug "dispatch: handler: " handler "event: " event 
+      (log/debug "dispatch: handler: " handler "event: " event
                  "\nargs: " args "\nstate: " @state)
 ;      (prn "image-label: " (sc/select (sc/to-root event) [:#image-label]))
       (apply swap! state handler event args)
@@ -84,10 +102,20 @@
    g - graphics context
   "
   (let [{:keys [lines current-line]} @state]
+    ;; draw line segments of full lines
     (apply sg/draw g (apply concat lines))
+    ;; draw endpoints of full lines
+;    (println "lines: " (count lines))
+;    (pprint lines)
+    (dorun
+      (for [[l s] lines]
+        (do
+;          (println "draw endpoints - " l)
+          (draw-line-end-points l s g))))
+    ;; draw line segment of working line if dragging
     (when current-line
       (apply sg/draw g current-line))))
-    
+
 (defn add-behaviors [root]
   (let [imgicon (sc/select root [:#image-label])
         styles (sc/select root [:.style])]
@@ -132,11 +160,11 @@
 (defn make-gui []
   ;; Swing native look and feel
   (sc/native!)
-  (sc/frame 
-    :title "Calculate Distances or Area" 
+  (sc/frame
+    :title "Calculate Distances or Area"
     :on-close :dispose
     :width 800 :height 400
-    :content 
+    :content
     (sc/border-panel :hgap 5 :vgap 5 :border 5
                  :north (sc/toolbar
                    :floatable? false
@@ -147,13 +175,13 @@
                            (sc/combobox :id :stroke :class :style :model [1 2 3 5 8 13 21])
                            "Color"
                            (sc/combobox :id :foreground :class :style :model colors :renderer color-cell)
-;                           (log/info "color selection: " (sc/selection (sc/select 
-;                           (sc/selection! (sc/combobox :id :background :class :style :model colors :renderer color-cell) 
+;                           (log/info "color selection: " (sc/selection (sc/select
+;                           (sc/selection! (sc/combobox :id :background :class :style :model colors :renderer color-cell)
 ;                                       nil)
                            ])
                   ; Create the drawing surface over an image held by an image label
                   :center (get-image-label)
-                  
+
                   ; Some buttons to swap the paint function
                   :south (sc/horizontal-panel :items ["Here's a label "
                                                         "And another"]))))
