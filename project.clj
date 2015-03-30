@@ -6,4 +6,5 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [seesaw "1.4.5"]
                  [org.clojure/tools.logging "0.3.1"]
-                 [org.clojure/math.numeric-tower "0.0.4"]])
+                 [org.clojure/math.numeric-tower "0.0.4"]]
+  :main image-measure.gui)
