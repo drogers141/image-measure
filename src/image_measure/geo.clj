@@ -1,11 +1,11 @@
 (ns image-measure.geo
- "Geometry and math functionality."
+ "Geometry and math functionality - pure functions."
  (:require [clojure.math.numeric-tower :as math]))
 
-(defn distance 
+(defn distance
   "Distance between two points."
   ([x1 y1 x2 y2]
-    (java.lang.Math/sqrt 
+    (java.lang.Math/sqrt
       (+ (math/expt (- x2 x1) 2) (math/expt (- y2 y1) 2)))))
 
 (defn midpoint
@@ -48,20 +48,19 @@
               cross-diff (- (* x1 y2) (* y1 x2))
               xcomp (* (+ x1 x2) cross-diff)
               ycomp (* (+ y1 y2) cross-diff)]
-;          (println (format "[%s %s] [%s %s] cross-diff = %s  xcomp = %s  ycomp = %s" 
+;          (println (format "[%s %s] [%s %s] cross-diff = %s  xcomp = %s  ycomp = %s"
 ;                           x1 y1 x2 y2 cross-diff xcomp ycomp))
           (recur (rest remaining) (+ xsum xcomp) (+ ysum ycomp)))))))
 
-              
+
 
 (defn calibrate-scale [known-line length lines]
- "Given a line and a length for that line in some units, returns 
+ "Given a line and a length for that line in some units, returns
    the length of each of a sequence of lines in those units.
-   
+
    known-line - [x1 y1 x2 y2]
    lines - [[x1 y1 x2 y2] .. [xn yn xn+1 yn+1]]
    return - [length_1 .. length_n] - length of each line in lines"
  (let [pixel-len (apply distance known-line)
        scale-factor (/ length pixel-len)]
    (vec (map #(* scale-factor (apply distance %)) lines))))
-

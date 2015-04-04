@@ -11,7 +11,7 @@
 
 (def colors [:black :white :red :blue :yellow :green :orange :purple nil])
 
-
+;;;;;;;;;;; Application State ;;;;;;;;;;
 ;; modes - domain terminology
 ;; mode of drawing
 ;; affects how lines drawn on image are considered
@@ -40,38 +40,10 @@
 ;; GLOBAL APPLICATION STATE
 (def state (atom (clean-state)))
 
-;; unit is pixels - a line of length less than this is still considered
-;; a point
-(def point-line-tolerance 5)
-
 (defn print-state
   ([] (pprint @state))
   ([k] (pprint (@state k))))
 
-(defn draw-point
-  ([x y r g style]
-    (sg/draw g (sg/circle x y r) style)))
-
-(defn draw-line-end-points [line2d style g]
-  (let [p1 (.getP1 line2d)
-        p2 (.getP2 line2d)
-        color (:foreground style)
-        line-width (.getLineWidth (:stroke style))]
-;    (prn "line-width: " line-width ", p1: " p1)
-    (draw-point (.x p1) (.y p1) line-width g style)
-    (draw-point (.x p2) (.y p2) line-width g style)))
-
-;; good for sanity checks
-(defn draw-a-red-x
-  "Draw a red X on a widget with the given graphics context"
-  [c g]
-  (let [w          (sc/width c)
-        h          (sc/height c)
-        line-style (sg/style :foreground "#FF0000" :stroke 3 :cap :round)
-        d 5]
-    (sg/draw g
-      (sg/line d d (- w d) (- h d)) line-style
-      (sg/line (- w d) d d (- h d)) line-style)))
 
 ;(defn red-x-icon []
 ;  (let [icon (get-icon)]
@@ -82,44 +54,6 @@
 ;; /Users/drogers/Desktop/images-craigslist/floorplan.jpg
 ;; /Users/drogers/Desktop/images-craigslist/cottage.jpg
 
-(defn start-new-line [state e]
-  (let [p (.getPoint e)]
-;    (log/info "state: " state)
-    (assoc state
-           :start-point [(.x p) (.y p)]
-           :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
-
-(defn drag-new-line [state e [dx dy]]
-  (let [p (.getPoint e)
-        [start-x start-y] (:start-point state)]
-    (assoc state :current-line
-           [(sg/line start-x start-y (.x p) (.y p)) (:style state)])))
-
-(defn finish-new-line-orig [state e]
-  (do
-;    (log/info "state: " state)
-    (-> state
-      (update-in [:lines] conj (:current-line state))
-      (assoc :current-line nil))))
-
-(defn finish-new-line [state e]
-  (do
-;    (log/info "state: " state)
-    (-> state
-      (update-in [:lines] conj (:current-line state))
-      (assoc :current-line nil))
-    ))
-
-(defn update-line-style
-  [state source]
-  (let [style-key (sc/id-of source) new-value (sc/selection source)]
-    (update-in state [:style] sg/update-style style-key new-value)))
-
-(defn delete-last-line [state]
-  "Delete the last completed line in saved state.
-   state - current state
-   Returns new state."
-  (update-in state [:lines] pop))
 
 (defn switch-mode [state source]
   "Switch the application mode in state - ie Lines/Polygons
@@ -129,6 +63,9 @@
     (assoc state :mode (if selected? (sc/id-of source)))))
 
 (defn dispatch  [handler]
+  "Returns event handler based on param that manipulates app state.
+   see *-new-line for input function examples.
+   handler - function (f [state event]) -> new-state"
   (fn [event & args]
     (when handler
 ;      (println "dispatch:")
@@ -241,7 +178,6 @@
                   ; Create the drawing surface over an image held by an image label
                   :center (get-image-label)
 
-                  ; Some buttons to swap the paint function
                   :south (sc/horizontal-panel :items ["Here's a label "
                                                         "And another"
                                                         (sc/button :text "Delete last"
@@ -251,10 +187,7 @@
 (defn reset-state! [root]
   "Reset application state
   root - root component of gui as far as seesaw is concerned"
-  (reset! state {:lines []
-                 :polygons []
-                 :style  (sg/style :color :black :stroke nil)
-                 :mode nil})
+  (reset! state (clean-state))
   (init-selections! root)
   (sc/repaint! root))
 
