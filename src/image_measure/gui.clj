@@ -5,7 +5,8 @@
             [seesaw.core :as sc]
             [seesaw.color :as sclr]
             [seesaw.graphics :as sg]
-            [seesaw.behave :as behave])
+            [seesaw.behave :as behave]
+            [image-measure.graphics :as g])
   (:import [javax.swing JFrame JPanel ImageIcon]
            [java.awt.geom Line2D]))
 
@@ -91,7 +92,7 @@
       (for [[l s] lines]
         (do
 ;          (println "draw endpoints - " l)
-          (draw-line-end-points l s g))))
+          (g/draw-line-end-points l s g))))
     ;; draw line segment of working line if dragging
     (when current-line
       (apply sg/draw g current-line))))
@@ -111,14 +112,20 @@
     (sc/listen modes :selection #(swap! state switch-mode %))
     (sc/listen delete-last-button
                :action (fn [actevent]
-                          (swap! state delete-last-line)
+                          (swap! state g/delete-last-line)
                           (sc/repaint! imgicon)))
-    (sc/listen styles :selection #(swap! state update-line-style %))
+    (sc/listen styles :selection #(swap! state g/update-line-style %))
     (behave/when-mouse-dragged imgicon
-      :start (dispatch start-new-line)
-      :drag  (dispatch drag-new-line)
-      :finish (dispatch finish-new-line))
-    (doseq [s styles] #(swap! state update-line-style s)))
+      :start (dispatch g/start-new-line)
+      :drag  (dispatch g/drag-new-line)
+      :finish (dispatch g/finish-new-line))
+    ;; add mouse coords to label in bottom panel
+    (sc/listen imgicon :mouse-moved
+               (fn [e]
+                 (let [display (sc/select root [:#mouse-coords])]
+                   (sc/config! display :text
+                               (str "(" (.getX e) ", " (.getY e) ")")))))
+    (doseq [s styles] #(swap! state g/update-line-style s)))
   root)
 
 (defn init-selections! [root]
@@ -178,11 +185,12 @@
                   ; Create the drawing surface over an image held by an image label
                   :center (get-image-label)
 
-                  :south (sc/horizontal-panel :items ["Here's a label "
-                                                        "And another"
-                                                        (sc/button :text "Delete last"
-                                                                   :id :delete-last-button)
-                                                                   ]))))
+                  :south (sc/horizontal-panel :id :south-panel
+                              :items ["Here's a label "
+                                        "And another"
+                                        (sc/button :text "Delete last"
+                                                   :id :delete-last-button)
+                                        (sc/label :id :mouse-coords)]))))
 
 (defn reset-state! [root]
   "Reset application state

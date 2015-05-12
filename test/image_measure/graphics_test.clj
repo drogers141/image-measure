@@ -39,3 +39,13 @@
 
 (deftest test-finish-polygon
   (is (= (finish-polygon state4) state5)))
+
+(deftest test-remove-first
+  (let [next-line [[411.0 14.0] [411.0 185.0]]
+         remaining '([[268.0 185.0] [268.0 14.0]]
+                      [[411.0 14.0] [411.0 185.0]]
+                      [[411.0 185.0] [268.0 185.0]])
+         expected '([[268.0 185.0] [268.0 14.0]]
+                     [[411.0 185.0] [268.0 185.0]])]
+    (is (= (remove-first next-line remaining)
+           expected))))
