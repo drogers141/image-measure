@@ -91,47 +91,6 @@
                          (conj (state :polygons) (state :current-polygon)))]
     (assoc new-state :current-polygon nil)))
 
-;(defn select-next-raw [forward ordered remaining]
-;  "select next line from remaining to add to ordered
-;   forward - boolean - if true adding next line to tail of ordered
-;      otherwise add to front
-;   return - updated [ordered remaining]"
-;  (let [select (fn [curr-pt] (first (filter (fn [l] (some #(= curr-pt %) l))
-;                                            remaining)))]
-;    (if forward
-;      (let [current-pt ((last ordered) 1)
-;            selected (select current-pt)]
-;        (if selected
-;          [(conj ordered selected) (disj remaining selected)]
-;          [ordered remaining]))
-;      (let [current-pt ((first ordered) 0)
-;            selected (select current-pt)]
-;        [(into [selected] ordered) (disj remaining selected)]))))
-;
-;(defn order-raw [lines]
-;  (loop [ordered [(first lines)]
-;         remaining (set (rest lines))
-;         ct 1]
-;    (if (or (< 10 ct) (not (seq remaining)))
-;      ordered
-;      (let [[new-ordered new-remaining] (select-next true ordered remaining)]
-;        (if (not= (count new-ordered) (count ordered))
-;          (recur new-ordered new-remaining (inc ct))
-;          (let [[new-o new-r] (select-next false ordered remaining)]
-;            (recur new-o new-r (inc ct))))))))
-;
-;(defn order [lines]
-;  (loop [ordered [(first lines)]
-;         remaining (set (rest lines))
-;         ct 1]
-;    (if (or (< 10 ct) (not (seq remaining)))
-;      ordered
-;      (let [[new-ordered new-remaining] (select-next true ordered remaining)]
-;        (if (not= (count new-ordered) (count ordered))
-;          (recur new-ordered new-remaining (inc ct))
-;          (let [[new-o new-r] (select-next false ordered remaining)]
-;            (recur new-o new-r (inc ct))))))))
-
 (defn select-next [state forward ordered remaining]
   "select next line from remaining to add to ordered
    ordered, remaining - vectors of indices pointing to lines in
