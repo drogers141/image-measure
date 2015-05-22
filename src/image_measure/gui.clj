@@ -42,7 +42,13 @@
 (def state (atom (clean-state)))
 
 (defn print-state
-  ([] (pprint @state))
+  "Pretty print parts or all of state.  Default prints lines out in
+   compact string form."
+;  ([] (pprint @state))
+  ([] (do
+        (pprint (for [k (keys @state) :when (not= k :lines)]
+            {k (@state k)}))
+        (println (format "lines:\n%s" (g/lines-as-str @state)))))
   ([k] (pprint (@state k))))
 
 

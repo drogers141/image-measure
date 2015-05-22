@@ -2,13 +2,14 @@
   "Functions and defs that relate to drawing and handling the state of
    lines and polygons."
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.pprint :refer [pprint]]
             [clojure.tools.logging :as log]
             [seesaw.core :as sc]
             [seesaw.color :as sclr]
             [seesaw.graphics :as sg]
             [seesaw.behave :as behave])
-  (:import [java.awt.geom Line2D, Point2D]))
+  (:import [java.awt.geom Line2D, Point2D, Point2D$Double]))
 
 ;; general utility, maybe collect into a namespace if we get more
 (defn remove-first [item coll]
@@ -29,8 +30,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; unit is pixels - a line of length less than this is still considered
-;; a point
+;; a point in certain contexts (polygon mode)
 (def point-line-tolerance 5)
+
+(defn points-close-enough [^Point2D pt1 ^Point2D pt2]
+  (and (>= point-line-tolerance (Math/abs (- (.x pt1) (.x pt2))))
+       (>= point-line-tolerance (Math/abs (- (.y pt1) (.y pt2))))))
 
 ;; utilities for accessing lines and points
 
@@ -45,8 +50,14 @@
 (defn ^Line2D line-from-index [state index]
   (((state :lines) index) 0))
 
-;(defn index-of [state ^Line2D l]
-;  nil)
+(defn lines-as-points [state]
+  (vec (for [l (state :lines)]
+         (get-points (l 0)))))
+
+(defn lines-as-str [state]
+  (str/join "\n" (for [l (state :lines)]
+    (str/join "<->" (map #(format "(%s, %s)" (int (.getX %)) (int (.getY %)))
+                         (get-points (l 0)))))))
 
 ;; drawing utilities for lines and points
 
@@ -121,7 +132,7 @@
     (if (not (seq remaining))
       ordered
       (let [[new-ordered new-remaining] (select-next state true ordered remaining)]
-;        (println "ordered: " ordered "\n:remaining: " remaining)
+;        (println "ordered: " ordered "\nremaining: " remaining)
 ;        (if (not= (count new-ordered) (count ordered))
 ;          (println "forward")
 ;          (println "reverse"))
@@ -131,28 +142,51 @@
             (recur new-o new-r)))))))
 
 (defn end-points [state partial-poly]
-  "Given ordered partial polygon returns the 2 endpoints"
+  "Given partial polygon returns the 2 endpoints in a vector.
+   Returns empty vector for complete polygon."
   (let [ordered (ordered-polygon state partial-poly)
-        p1 (-> (line-from-index state (first ordered)) get-points (get 0))
-        p2 (-> (line-from-index state (last ordered)) get-points (get 1))]
-    [p1 p2]))
+         counts (frequencies (flatten (for [l (map #(line-from-index state %) ordered)]
+                                        (get-points l))))]
+     (vec (map first (filter (fn [[_ v]] (= 1 v)) counts)))))
 
-
-;;****** after these funcs implemented need to use endpoints to
-;;****** start drawing of any new line in polygon mode unless
-;; starting or finishing the current polygon
-;; don't worry about highlighting yet
-;;*************
-
-
-(defn start-new-line [state e]
+(defn start-new-line-orig [state e]
   (let [p (.getPoint e)]
 ;    (log/info "state: " state)
     (assoc state
-           :start-point [(.x p) (.y p)]
-           :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
+       :start-point [(.x p) (.y p)]
+       :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
+
+(defn start-new-line [state e]
+  "Start a new line - in polygon mode if there is a current polygon
+   a new line can only be started from one of its endpoints."
+  (let [p (.getPoint e)]
+    (log/info "state: " state)
+    (if (= (state :mode) :polygons)
+      (do
+        (println "polygon mode")
+        ;; if current poly - line must start from an endpoint
+        (if (state :current-polygon)
+          (let [endpts (end-points state (state :current-polygon))
+                close-pt (first (filter #(points-close-enough p %) endpts))]
+            (println "** current polygon **")
+            (println "endpts: " endpts "\nclose-pt: " close-pt)
+            (if close-pt
+              (assoc state
+                     :start-point [(.x close-pt) (.y close-pt)]
+                     :current-line [(sg/line (.x close-pt) (.y close-pt)
+                                             (.x close-pt) (.y close-pt))
+                                    (:style state)])
+              state))
+          (assoc state
+             :start-point [(.x p) (.y p)]
+             :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
+      ;; not polygon mode, just start new line
+      (assoc state
+             :start-point [(.x p) (.y p)]
+             :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)]))))
 
 (defn drag-new-line [state e [dx dy]]
+  "New line has been started - add to it."
   (let [p (.getPoint e)
         [start-x start-y] (:start-point state)]
     (assoc state :current-line
@@ -166,12 +200,23 @@
       (assoc :current-line nil))))
 
 (defn finish-new-line [state e]
-  (do
-;    (log/info "state: " state)
-    (-> state
-      (update-in [:lines] conj (:current-line state))
-      (assoc :current-line nil))
-    ))
+  "Finish newly drawn line.  In polygon mode add it to the current polygon
+   (possibly starting/finishing the polygon)."
+  (let [new-state (-> state
+                    (update-in [:lines] conj (:current-line state))
+                    (assoc :current-line nil))]
+    (if (= (state :mode) :polygons)
+      (if (state :current-polygon)
+        (let [updated-state (add-latest-line-to-current-polygon new-state)]
+          ;; nil end-points means completed polygon
+          (if (nil? (end-points updated-state (updated-state :current-polygon)))
+            (finish-polygon updated-state)
+            updated-state))
+        ;; no :current-polygon so start it with this line
+        (start-new-polygon new-state))
+      ;; not :polygons mode, just add the line
+      new-state)))
+
 
 (defn update-line-style
   [state source]
