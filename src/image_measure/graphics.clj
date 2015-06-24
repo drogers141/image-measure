@@ -160,7 +160,7 @@
   "Start a new line - in polygon mode if there is a current polygon
    a new line can only be started from one of its endpoints."
   (let [p (.getPoint e)]
-    (log/info "state: " state)
+;    (log/info "state: " state)
     (if (= (state :mode) :polygons)
       (do
         (println "polygon mode")
@@ -169,6 +169,7 @@
           (let [endpts (end-points state (state :current-polygon))
                 close-pt (first (filter #(points-close-enough p %) endpts))]
             (println "** current polygon **")
+            (log/info "endpts: " endpts "\nclose-pt: " close-pt)
             (println "endpts: " endpts "\nclose-pt: " close-pt)
             (if close-pt
               (assoc state
@@ -225,6 +226,15 @@
 
 (defn delete-last-line [state]
   "Delete the last completed line in saved state.
+   Removes line from current-polygon if applicable.
    state - current state
    Returns new state."
-  (update-in state [:lines] pop))
+  (if (< 0 (count (state :lines)))
+    (let [index (dec (count (state :lines)))
+  ;        new-current-poly (vec (remove-first index (state :current-polygon)))
+          state2 (update-in state [:lines] pop)]
+      (if (get state2 :current-polygon)
+        (assoc state2 :current-polygon
+               (vec (remove-first index (state :current-polygon))))
+        state2))
+    state))
