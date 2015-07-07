@@ -140,7 +140,7 @@
    returns root"
   (let [width (sc/select root [:#stroke])
         color (sc/select root [:#foreground])
-        mode (sc/select root [:#lines])]
+        mode (sc/select root [:#polygons])]
     (sc/selection! width 3)
     (sc/selection! color :red)
     (sc/selection! mode true))

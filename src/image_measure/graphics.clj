@@ -103,9 +103,10 @@
     (assoc new-state :current-polygon nil)))
 
 (defn select-next [state forward ordered remaining]
-  "select next line from remaining to add to ordered
-   ordered, remaining - vectors of indices pointing to lines in
-     @state :lines vector
+  "Helper for ordered-polygon: select next line from remaining set to add to
+   those previously ordered
+   ordered, remaining - vector and set, respectively, of indices pointing to
+   lines in @state :lines vector
    forward - boolean - if true adding next line to tail of ordered
       otherwise add to front
    return - updated [ordered remaining]"
@@ -113,13 +114,13 @@
         (fn [curr-pt] (first (filter (fn [i] (some #(= curr-pt %) (get-points (line-from-index state i))))
                          remaining)))]
     (if forward
-      (let [current-pt ((get-points (line-from-index state (last ordered))) 1)
-            selected (select current-pt)]
+      (let [curr-pts (get-points (line-from-index state (last ordered)))
+            selected (some identity (map select curr-pts))]
         (if selected
           [(conj ordered selected) (disj remaining selected)]
           [ordered remaining]))
-      (let [current-pt ((get-points (line-from-index state (first ordered))) 0)
-            selected (select current-pt)]
+      (let [curr-pts (get-points (line-from-index state (first ordered)))
+            selected (some identity (map select curr-pts))]
         [(into [selected] ordered) (disj remaining selected)]))))
 
 (defn ordered-polygon [state poly]
@@ -163,14 +164,14 @@
 ;    (log/info "state: " state)
     (if (= (state :mode) :polygons)
       (do
-        (println "polygon mode")
+;        (log/info "polygon mode")
         ;; if current poly - line must start from an endpoint
         (if (state :current-polygon)
           (let [endpts (end-points state (state :current-polygon))
                 close-pt (first (filter #(points-close-enough p %) endpts))]
-            (println "** current polygon **")
+            (log/info "** start-new-line: current polygon **")
             (log/info "endpts: " endpts "\nclose-pt: " close-pt)
-            (println "endpts: " endpts "\nclose-pt: " close-pt)
+;            (println "endpts: " endpts "\nclose-pt: " close-pt)
             (if close-pt
               (assoc state
                      :start-point [(.x close-pt) (.y close-pt)]
@@ -200,6 +201,25 @@
       (update-in [:lines] conj (:current-line state))
       (assoc :current-line nil))))
 
+(defn close-current-polygon [state]
+  "Call this if you have points-close-enough with the end-points of the
+   :current-polygon before calling finish-polygon.
+   Replaces the last line with one that has as its last point the shared
+   point in the polygon.
+   Returns updated state."
+  (let [endpts (end-points state (state :current-polygon))
+        last-line-index ((state :current-polygon) (dec (count (state :current-polygon))))
+        last-line (line-from-index state last-line-index)
+        last-line-pts (get-points last-line)
+        keep-pt (first (filter #(not (points-close-enough (endpts 0) %)) last-line-pts))
+        other-pt (first (filter #(not= (get-other-pt last-line keep-pt) %) endpts))
+        new-line (sg/line (.getX keep-pt) (.getY keep-pt) (.getX other-pt) (.getY other-pt))
+        new-state (assoc-in state [:lines last-line-index 0] new-line)]
+    ;; nothing to do if end points are already the same point
+    (if (= (endpts 0) (endpts 1))
+      state
+      new-state)))
+
 (defn finish-new-line [state e]
   "Finish newly drawn line.  In polygon mode add it to the current polygon
    (possibly starting/finishing the polygon)."
@@ -208,11 +228,27 @@
                     (assoc :current-line nil))]
     (if (= (state :mode) :polygons)
       (if (state :current-polygon)
-        (let [updated-state (add-latest-line-to-current-polygon new-state)]
-          ;; nil end-points means completed polygon
-          (if (nil? (end-points updated-state (updated-state :current-polygon)))
-            (finish-polygon updated-state)
-            updated-state))
+        (do
+          (log/info "** finish-new-line: entering let **")
+          (let [updated-state (add-latest-line-to-current-polygon new-state)
+                endpts (end-points updated-state (updated-state :current-polygon))]
+            ;; close enough end points means completed polygon
+            (log/info "** finish-new-line: :current-polygon **")
+            (log/info "endpts: " endpts)
+            (cond
+              (nil? endpts)
+              (do
+                (log/info "** finish-new-line: endpts nil")
+                new-state)
+              (apply points-close-enough endpts)
+                ;; end points are close enough - close polygon and finish it
+              (do
+                (log/info "** finish-new-line: finish poly - endpts: " endpts)
+                (finish-polygon (close-current-polygon updated-state)))
+              :else
+              (do
+                (log/info "** finish-new-line: add line to poly")
+                updated-state))))
         ;; no :current-polygon so start it with this line
         (start-new-polygon new-state))
       ;; not :polygons mode, just add the line
@@ -227,6 +263,12 @@
 (defn delete-last-line [state]
   "Delete the last completed line in saved state.
    Removes line from current-polygon if applicable.
+
+   Todo maybe:
+      - deleting last line from :current-polygon leaves it as an empty
+      vec - not nil - might want to change
+      - deleting from a closed polygon is not handled as far as polygons go
+
    state - current state
    Returns new state."
   (if (< 0 (count (state :lines)))
