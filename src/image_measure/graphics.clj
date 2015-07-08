@@ -265,8 +265,8 @@
    Removes line from current-polygon if applicable.
 
    Todo maybe:
-      - deleting last line from :current-polygon leaves it as an empty
-      vec - not nil - might want to change
+      - deleting last line from :current-polygon leaves it as an empty vec
+        - not nil - might want to change
       - deleting from a closed polygon is not handled as far as polygons go
 
    state - current state
