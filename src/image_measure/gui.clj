@@ -146,7 +146,8 @@
     (sc/selection! mode true))
   root)
 
-(def floorplan-img "/Users/drogers/Desktop/images-craigslist/floorplan.jpg")
+;(def floorplan-img "/Users/drogers/Desktop/images-craigslist/floorplan.jpg")
+(def floorplan-img "/Users/drogers/Desktop/images-craigslist/floorplan-w-1000.jpg")
 
 (defn get-image-label []
   (let [icon (ImageIcon. (io/as-url (str "file://" floorplan-img)) "describe me")

@@ -150,13 +150,6 @@
                                         (get-points l))))]
      (vec (map first (filter (fn [[_ v]] (= 1 v)) counts)))))
 
-(defn start-new-line-orig [state e]
-  (let [p (.getPoint e)]
-;    (log/info "state: " state)
-    (assoc state
-       :start-point [(.x p) (.y p)]
-       :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
-
 (defn start-new-line [state e]
   "Start a new line - in polygon mode if there is a current polygon
    a new line can only be started from one of its endpoints."
@@ -194,13 +187,6 @@
     (assoc state :current-line
            [(sg/line start-x start-y (.x p) (.y p)) (:style state)])))
 
-(defn finish-new-line-orig [state e]
-  (do
-;    (log/info "state: " state)
-    (-> state
-      (update-in [:lines] conj (:current-line state))
-      (assoc :current-line nil))))
-
 (defn close-current-polygon [state]
   "Call this if you have points-close-enough with the end-points of the
    :current-polygon before calling finish-polygon.
@@ -229,7 +215,6 @@
     (if (= (state :mode) :polygons)
       (if (state :current-polygon)
         (do
-          (log/info "** finish-new-line: entering let **")
           (let [updated-state (add-latest-line-to-current-polygon new-state)
                 endpts (end-points updated-state (updated-state :current-polygon))]
             ;; close enough end points means completed polygon
