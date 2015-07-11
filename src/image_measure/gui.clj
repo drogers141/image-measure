@@ -33,13 +33,21 @@
   ;; polygons are implemented as references to lines in the lines vector
   ;; vectors of indices
   :polygons []
+  ;; one of :polygons
+  :selected-polygon nil
   ;; current style - graphics.Style
   :style  (sg/style :color :black :stroke nil)
   ;; current mode - one of :lines :polygons
   :mode nil
-  ;; click-mode - either :draw or :calculate -
-  ;; ie clicking and dragging to draw polygons or selecting a polygon
-  ;; to calculate line lengths or area
+  ;; click-mode - either :draw or :calculate
+  ;; what happens when you click on the image
+  ;; :draw - click and drag to create the :current-polygon
+  ;;     once finished, :current-polygon goes to :polygons
+  ;; :calculate - if there is at least one polygon in :polygons
+  ;;     clicking on a line or point belonging to one will
+  ;;     show empty labels for the lines and area calculations
+  ;;     the user can then fill in whatever data and click "Calculate"
+  ;;
   ;; will phase out :lines or :polygons values for :mode and may rename
   ;; this to :mode
   :click-mode :draw})
@@ -67,7 +75,7 @@
 ;; /Users/drogers/Desktop/images-craigslist/floorplan.jpg
 ;; /Users/drogers/Desktop/images-craigslist/cottage.jpg
 
-
+;;**** TODO - REMOVE ALONG WITH :mode stuff ***
 (defn switch-mode [state source]
   "Switch the application mode in state - ie Lines/Polygons
    state - current app state map
@@ -78,7 +86,7 @@
 (defn dispatch  [handler]
   "Returns event handler based on param that manipulates app state.
    ** ACCESSES GLOBAL STATE: @state **
-   see *-new-line for input function examples.
+   Used for drawing lines: see *-new-line for input function examples.
    handler - function (f [state event]) -> new-state"
   (fn [event & args]
     (when (and handler (= (@state :click-mode) :draw))
@@ -129,10 +137,16 @@
                           (swap! state g/delete-last-line)
                           (sc/repaint! imgicon)))
     (sc/listen styles :selection #(swap! state g/update-line-style %))
+    ;; click and drag applies in :draw :click-mode
     (behave/when-mouse-dragged imgicon
       :start (dispatch g/start-new-line)
       :drag  (dispatch g/drag-new-line)
       :finish (dispatch g/finish-new-line))
+    ;; simple click applies to selection of polys in :calculate :click-mode
+    (sc/listen imgicon :mouse-clicked
+               (fn [e]
+                 (when (= :calculate (@state :click-mode))
+                   (println "click: (" (.getX e) ", " (.getY e) ")"))))
     ;; add mouse coords to label in bottom panel
     (sc/listen imgicon :mouse-moved
                (fn [e]
