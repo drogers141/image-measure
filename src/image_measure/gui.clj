@@ -6,64 +6,13 @@
             [seesaw.color :as sclr]
             [seesaw.graphics :as sg]
             [seesaw.behave :as behave]
-            [image-measure.graphics :as g])
+            [image-measure.graphics :as g]
+            [image-measure.state :as state])
   (:import [javax.swing JFrame JPanel ImageIcon]
            [java.awt.geom Line2D]))
 
 (def colors [:black :white :red :blue :yellow :green :orange :purple nil])
 
-;;;;;;;;;;; Application State ;;;;;;;;;;
-;; modes - domain terminology
-;; mode of drawing
-;; affects how lines drawn on image are considered
-;; Lines - lines drawn are considered unconnected and a set
-;;       - lengths can be calculated based on a scale length for one line
-;; Polygons - lines drawn are connected to active polygon
-;;          - active polygon is finished when line closes it by connecting
-;;              2 points
-;;          - only 1 active polygon at a time - kept in state as
-;;          :current-polygon
-;;
-(defn clean-state []
-  {
-  ;; lines [[Line2D graphics.Style] ..]
-  ;; graphics.Style {:foreground <Color> :background <Color>
-  ;;                 :stroke <Stroke> :font}
-  :lines []
-  ;; polygons are implemented as references to lines in the lines vector
-  ;; vectors of indices
-  :polygons []
-  ;; one of :polygons
-  :selected-polygon nil
-  ;; current style - graphics.Style
-  :style  (sg/style :color :black :stroke nil)
-  ;; current mode - one of :lines :polygons
-  :mode nil
-  ;; click-mode - either :draw or :calculate
-  ;; what happens when you click on the image
-  ;; :draw - click and drag to create the :current-polygon
-  ;;     once finished, :current-polygon goes to :polygons
-  ;; :calculate - if there is at least one polygon in :polygons
-  ;;     clicking on a line or point belonging to one will
-  ;;     show empty labels for the lines and area calculations
-  ;;     the user can then fill in whatever data and click "Calculate"
-  ;;
-  ;; will phase out :lines or :polygons values for :mode and may rename
-  ;; this to :mode
-  :click-mode :draw})
-
-;; GLOBAL APPLICATION STATE
-(def state (atom (clean-state)))
-
-(defn print-state
-  "Pretty print parts or all of state.  Default prints lines out in
-   compact string form."
-;  ([] (pprint @state))
-  ([] (do
-        (pprint (for [k (keys @state) :when (not= k :lines)]
-            {k (@state k)}))
-        (println (format "lines:\n%s" (g/lines-as-str @state)))))
-  ([k] (pprint (@state k))))
 
 
 ;(defn red-x-icon []
@@ -85,26 +34,24 @@
 
 (defn dispatch  [handler]
   "Returns event handler based on param that manipulates app state.
-   ** ACCESSES GLOBAL STATE: @state **
+   ** ACCESSES GLOBAL STATE: @state/state **
    Used for drawing lines: see *-new-line for input function examples.
    handler - function (f [state event]) -> new-state"
   (fn [event & args]
-    (when (and handler (= (@state :click-mode) :draw))
+    (when (and handler (= (@state/state :click-mode) :draw))
 ;      (println "dispatch:")
 ;      (println "event: " event "\nargs: " args)
-      (log/info "dispatch: handler: " handler "event: " event)
-;                 "\nargs: " args "\nstate: " @state)
-;      (prn "image-label: " (sc/select (sc/to-root event) [:#image-label]))
-      (apply swap! state handler event args)
+;      (log/info "dispatch: handler: " handler "event: " event)
+      (apply swap! state/state handler event args)
       (sc/repaint! (sc/select (sc/to-root event) [:#image-label])))))
 
 
 (defn render [^javax.swing.JComponent c ^java.awt.Graphics2D g]
-  "** ACCESSES GLOBAL STATE: @state **
+  "** ACCESSES GLOBAL STATE: @state/state **
    c - component
    g - graphics context
   "
-  (let [{:keys [lines current-line]} @state]
+  (let [{:keys [lines current-line]} @state/state]
     ;; draw line segments of full lines
     (apply sg/draw g (apply concat lines))
     ;; draw endpoints of full lines
@@ -131,12 +78,12 @@
         modes (sc/button-group :buttons (sc/select root [:.mode]))
         styles (sc/select root [:.style])
         delete-last-button (sc/select root [:#delete-last-button])]
-    (sc/listen modes :selection #(swap! state switch-mode %))
+    (sc/listen modes :selection #(swap! state/state switch-mode %))
     (sc/listen delete-last-button
                :action (fn [actevent]
-                          (swap! state g/delete-last-line)
+                          (swap! state/state g/delete-last-line)
                           (sc/repaint! imgicon)))
-    (sc/listen styles :selection #(swap! state g/update-line-style %))
+    (sc/listen styles :selection #(swap! state/state g/update-line-style %))
     ;; click and drag applies in :draw :click-mode
     (behave/when-mouse-dragged imgicon
       :start (dispatch g/start-new-line)
@@ -145,7 +92,7 @@
     ;; simple click applies to selection of polys in :calculate :click-mode
     (sc/listen imgicon :mouse-clicked
                (fn [e]
-                 (when (= :calculate (@state :click-mode))
+                 (when (= :calculate (@state/state :click-mode))
                    (println "click: (" (.getX e) ", " (.getY e) ")"))))
     ;; add mouse coords to label in bottom panel
     (sc/listen imgicon :mouse-moved
@@ -153,7 +100,7 @@
                  (let [display (sc/select root [:#mouse-coords])]
                    (sc/config! display :text
                                (str "(" (.getX e) ", " (.getY e) ")")))))
-    (doseq [s styles] #(swap! state g/update-line-style s)))
+    (doseq [s styles] #(swap! state/state g/update-line-style s)))
   root)
 
 (defn init-selections! [root]
@@ -191,7 +138,7 @@
 
 (defn make-gui []
   "Constructs and returns the jframe gui.
-   ** MANIPULATES GLOBAL STATE: @state **"
+   ** MANIPULATES GLOBAL STATE: @state/state **"
   ;; Swing native look and feel
   (sc/native!)
   (let [click-mode-group (sc/button-group)
@@ -227,22 +174,32 @@
     (sc/listen click-mode-group :action
         (fn [e]
           (if (= "Draw" (sc/text (sc/selection click-mode-group)))
-            (swap! state assoc :click-mode :draw)
-            (swap! state assoc :click-mode :calculate))))
+            (swap! state/state assoc :click-mode :draw)
+            (swap! state/state assoc :click-mode :calculate))))
     gui))
+
+(defn print-state
+  "Pretty print parts or all of state.  Default prints lines out in
+   compact string form."
+;  ([] (pprint @state/state))
+  ([] (do
+        (pprint (for [k (keys @state/state) :when (not= k :lines)]
+            {k (@state/state k)}))
+        (println (format "lines:\n%s" (g/lines-as-str @state/state)))))
+  ([k] (pprint (@state/state k))))
 
 (defn reset-state! [root]
   "Reset application state
-   ** MANIPULATES GLOBAL STATE: @state **
+   ** MANIPULATES GLOBAL STATE: @state/state **
    root - root component of gui as far as seesaw is concerned"
-  (reset! state (clean-state))
+  (reset! state/state (state/clean-state))
   (init-selections! root)
   (sc/repaint! root))
 
 (defn run-gui []
-  "** ACCESSES GLOBAL STATE: @state **"
+  "** ACCESSES GLOBAL STATE: @state/state **"
   (let [gui (make-gui)]
-    (reset! state (clean-state))
+    (reset! state/state (state/clean-state))
     (sc/config! gui :on-close :dispose)
     (sc/invoke-later
       (-> gui add-behaviors init-selections! sc/pack! sc/show!))

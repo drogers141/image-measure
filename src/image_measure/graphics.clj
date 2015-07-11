@@ -91,6 +91,7 @@
 (defn start-new-polygon [state]
   "Returns new state with last line in state being first line in
    :current-polygon"
+  (log/info "** start-new-polygon **")
   (assoc state :current-polygon [(dec (count (state :lines)))]))
 
 (defn add-latest-line-to-current-polygon [state]
@@ -240,8 +241,7 @@
       new-state)))
 
 
-(defn update-line-style
-  [state source]
+(defn update-line-style [state source]
   (let [style-key (sc/id-of source) new-value (sc/selection source)]
     (update-in state [:style] sg/update-style style-key new-value)))
 
