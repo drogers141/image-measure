@@ -36,7 +36,13 @@
   ;; current style - graphics.Style
   :style  (sg/style :color :black :stroke nil)
   ;; current mode - one of :lines :polygons
-  :mode nil})
+  :mode nil
+  ;; click-mode - either :draw or :calculate -
+  ;; ie clicking and dragging to draw polygons or selecting a polygon
+  ;; to calculate line lengths or area
+  ;; will phase out :lines or :polygons values for :mode and may rename
+  ;; this to :mode
+  :click-mode :draw})
 
 ;; GLOBAL APPLICATION STATE
 (def state (atom (clean-state)))
@@ -71,21 +77,23 @@
 
 (defn dispatch  [handler]
   "Returns event handler based on param that manipulates app state.
+   ** ACCESSES GLOBAL STATE: @state **
    see *-new-line for input function examples.
    handler - function (f [state event]) -> new-state"
   (fn [event & args]
-    (when handler
+    (when (and handler (= (@state :click-mode) :draw))
 ;      (println "dispatch:")
 ;      (println "event: " event "\nargs: " args)
-      (log/debug "dispatch: handler: " handler "event: " event
-                 "\nargs: " args "\nstate: " @state)
+      (log/info "dispatch: handler: " handler "event: " event)
+;                 "\nargs: " args "\nstate: " @state)
 ;      (prn "image-label: " (sc/select (sc/to-root event) [:#image-label]))
       (apply swap! state handler event args)
       (sc/repaint! (sc/select (sc/to-root event) [:#image-label])))))
 
 
 (defn render [^javax.swing.JComponent c ^java.awt.Graphics2D g]
-  "c - component
+  "** ACCESSES GLOBAL STATE: @state **
+   c - component
    g - graphics context
   "
   (let [{:keys [lines current-line]} @state]
@@ -168,45 +176,57 @@
     (sc/config! this :text "None")))
 
 (defn make-gui []
+  "Constructs and returns the jframe gui.
+   ** MANIPULATES GLOBAL STATE: @state **"
   ;; Swing native look and feel
   (sc/native!)
-  (sc/frame
-    :title "Calculate Distances or Area"
-    :on-close :exit
-    :width 800 :height 400
-    :content
-    (sc/border-panel :hgap 5 :vgap 5 :border 5
-                 :north (sc/toolbar
-                   :floatable? false
-                   :items [(sc/toggle :id :lines     :class :mode :text "Lines")
-                           (sc/toggle :id :polygons  :class :mode :text "Polygons")
-                           :separator
-                           "Width"
-                           (sc/combobox :id :stroke :class :style :model [1 2 3 5 8 13 21])
-                           "Color"
-                           (sc/combobox :id :foreground :class :style :model colors :renderer color-cell)
-;                           (log/info "color selection: " (sc/selection (sc/select
-;                           (sc/selection! (sc/combobox :id :background :class :style :model colors :renderer color-cell)
-;                                       nil)
-                           ])
-                  ; Create the drawing surface over an image held by an image label
-                  :center (get-image-label)
+  (let [click-mode-group (sc/button-group)
+        gui (sc/frame
+            :title "Calculate Distances or Area"
+            :on-close :exit
+            :width 800 :height 400
+            :content
+            (sc/border-panel :hgap 5 :vgap 5 :border 5
+                         :north (sc/toolbar
+                           :floatable? false
+                           :items [(sc/toggle :id :lines     :class :mode :text "Lines")
+                                   (sc/toggle :id :polygons  :class :mode :text "Polygons")
+                                   :separator
+                                   (sc/radio :text "Draw" :selected? true :group click-mode-group)
+                                   (sc/radio :text "Calculate" :group click-mode-group)
+                                   :separator
+                                   "Width"
+                                   (sc/combobox :id :stroke :class :style :model [1 2 3 5 8 13 21])
+                                   "Color"
+                                   (sc/combobox :id :foreground :class :style :model colors :renderer color-cell)
+                                   ])
+                          ; Create the drawing surface over an image held by an image label
+                          :center (get-image-label)
 
-                  :south (sc/horizontal-panel :id :south-panel
-                              :items ["Here's a label "
-                                        "And another"
-                                        (sc/button :text "Delete last"
-                                                   :id :delete-last-button)
-                                        (sc/label :id :mouse-coords)]))))
+                          :south (sc/horizontal-panel :id :south-panel
+                                      :items ["Here's a label "
+                                                "And another"
+                                                (sc/button :text "Delete last"
+                                                           :id :delete-last-button)
+                                                (sc/label :id :mouse-coords)])))]
+
+    (sc/listen click-mode-group :action
+        (fn [e]
+          (if (= "Draw" (sc/text (sc/selection click-mode-group)))
+            (swap! state assoc :click-mode :draw)
+            (swap! state assoc :click-mode :calculate))))
+    gui))
 
 (defn reset-state! [root]
   "Reset application state
-  root - root component of gui as far as seesaw is concerned"
+   ** MANIPULATES GLOBAL STATE: @state **
+   root - root component of gui as far as seesaw is concerned"
   (reset! state (clean-state))
   (init-selections! root)
   (sc/repaint! root))
 
 (defn run-gui []
+  "** ACCESSES GLOBAL STATE: @state **"
   (let [gui (make-gui)]
     (reset! state (clean-state))
     (sc/config! gui :on-close :dispose)
