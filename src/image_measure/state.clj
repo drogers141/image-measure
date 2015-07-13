@@ -1,6 +1,7 @@
 (ns image-measure.state
   (:require [clojure.pprint :refer [pprint]]
-            [seesaw.graphics :as sg]))
+            [seesaw.graphics :as sg]
+            [seesaw.color :as color]))
 
 ;;;;;;;;;;; Application State ;;;;;;;;;;
 ;; modes - domain terminology
@@ -28,6 +29,10 @@
   :selected-polygon nil
   ;; current style - graphics.Style
   :style  (sg/style :color :black :stroke nil)
+  ;; color of lines while drawing the current polygon
+  :current-polygon-color nil
+  ;; color of lines in finished polygons that you can select for calculation
+  :finished-polygon-color (color/color 0 216 0)
   ;; current mode - one of :lines :polygons
   :mode nil
   ;; click-mode - either :draw or :calculate

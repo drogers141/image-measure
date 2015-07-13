@@ -8,14 +8,19 @@
             [seesaw.core :as sc]
             [seesaw.color :as sclr]
             [seesaw.graphics :as sg]
-            [seesaw.behave :as behave])
+            [seesaw.behave :as behave]
+            [seesaw.font :as sfont])
   (:import [java.awt.geom Line2D, Point2D, Point2D$Double]))
 
-;; general utility, maybe collect into a namespace if we get more
+;; general utilities, maybe collect into a namespace if we get more
 (defn remove-first [item coll]
   "Returns collection coll with first element equal to item removed."
   (let [[n m] (split-with (partial not= item) coll)]
     (concat n (rest m))))
+
+(defn indices [pred coll]
+  "Returns indices in collection coll of elements that satisfy predicate pred."
+  (keep-indexed #(when (pred %2) %1) coll))
 
 ;(defmacro print-debug [x & vars]
 ;  "prints name of vars with values"
@@ -25,12 +30,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Application State passed as param to these functions is a map
-;; that is defined and discussed in image-measure.gui
+;; that is defined and discussed in image-measure.state
 ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ;; unit is pixels - a line of length less than this is still considered
-;; a point in certain contexts (polygon mode)
+;; a point when drawing polygons
 (def point-line-tolerance 5)
 
 (defn points-close-enough [^Point2D pt1 ^Point2D pt2]
@@ -74,6 +79,13 @@
     (draw-point (.x p1) (.y p1) line-width g style)
     (draw-point (.x p2) (.y p2) line-width g style)))
 
+(defn change-line-color [state index color]
+  "Return new state with line at index having new color.
+   color - color object or keyword accepted by seesaw (e.g. :green)"
+  (let [old-style (get-in state [:lines index 1])
+        new-style (sg/update-style old-style :foreground color)]
+    (assoc-in state [:lines index 1] new-style)))
+
 ;; good for sanity checks
 (defn draw-a-red-x
   "Draw a red X on a widget with the given graphics context"
@@ -99,9 +111,15 @@
          (conj (state :current-polygon) (dec (count (state :lines))))))
 
 (defn finish-polygon [state]
-  (let [new-state (assoc state :polygons
-                         (conj (state :polygons) (state :current-polygon)))]
-    (assoc new-state :current-polygon nil)))
+  "Finish current polygon:
+      * move the vector of line indices from :current-polygon to :polygons
+      * change the line colors for that polygon to :finished-polygon-color"
+  (let [state1 (assoc state :polygons
+                      (conj (state :polygons) (state :current-polygon)))
+        state2 (assoc state1 :current-polygon nil)
+        poly (get (state2 :polygons) (dec (count (state2 :polygons))))
+        c (state :finished-polygon-color)]
+    (reduce #(change-line-color %1 %2 c) state2 poly)))
 
 (defn select-next [state forward ordered remaining]
   "Helper for ordered-polygon: select next line from remaining set to add to
@@ -265,3 +283,57 @@
                (vec (remove-first index (state :current-polygon))))
         state2))
     state))
+
+(defn line-intersects [state index x y]
+  "Returns true if the line with index index in state intersects with point
+  (x, y).  This takes into account the line width based on the given line's
+  stroke."
+  (let [l (line-from-index state index)
+        stroke (get-in (state :lines) [index 1 :stroke])
+        width (.getLineWidth stroke)]
+    (.intersects l (- x width) (- y width) (* 2 width) (* 2 width))))
+
+(defn find-polygon [state x y]
+  "If the point (x, y) is on a line or point defining a polygon in state,
+   the index of the polygon in :polygons is returned.  Otherwise nil.
+   Tolerance is determined by the lines and points themselves (stroke, etc)."
+  (when (< 0 (count (state :polygons)))
+    (let [found #(line-intersects state % x y)
+          in-poly #(some found %)]
+      (first (indices in-poly (state :polygons))))))
+
+(defn label-geometry [g x y fontsize text]
+  "Returns map of geometry of label created from string text at x, y
+   g - graphics context
+   x, y - top left of outside of label
+   fontsize - size of font
+   returns map { :x <x> :y <y>
+      :width <full width> :height <full height>
+      :text-height <height of string> :text-width <width of string>
+      :string-x <x for drawString> :string-y <y for drawString> }
+
+   Note - x + width and y + height appear to not take into account stroke
+   of outside rectangle of label - ie 2-3 pixels shy"
+  (let [font (sfont/font :name :sans-serif :size fontsize)
+       metrics (.getFontMetrics g font)
+       twidth (.stringWidth metrics text)
+       theight (.getHeight metrics)
+       wpad (* 0.25 theight)
+       hpad (* 0.125 theight)]
+    {:x x :y y :width (int (+ twidth (* 2 wpad))) :height (int (+ theight (* 2 hpad)))
+     :text-width twidth :text-height theight
+     :string-x (int (+ x wpad)) :string-y (int (+ y theight))}))
+
+(defn paint-label [^java.awt.Graphics2D g x y text fg bg]
+  (let [stroke (sg/stroke :width 2 :join :round)
+       fontsize 18
+       font (sfont/font :name :sans-serif :size fontsize)
+       geo (label-geometry g x y fontsize text)]
+    (doto g
+      (.setFont font)
+      (.setColor bg)
+      (.fillRect x y (geo :width) (geo :height))
+      (.setColor fg)
+      (.drawString text (geo :string-x) (geo :string-y))
+      (.setStroke stroke)
+      (.drawRect x y (geo :width) (geo :height)))))

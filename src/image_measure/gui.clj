@@ -64,7 +64,11 @@
           (g/draw-line-end-points l s g))))
     ;; draw line segment of working line if dragging
     (when current-line
-      (apply sg/draw g current-line))))
+      (apply sg/draw g current-line))
+
+;    (g/paint-label g 680 150 "HelloWorld.0" (sclr/color :black) (sclr/color :white))
+;    (println (g/label-geometry g 445 195 18 "3.14159"))
+    (g/paint-label g 445 195 "3.14159" (sclr/color :black) (sclr/color :white))))
 
 ;(def del-last-line-action
 ;  (sc/action :name "delete-last-line"
@@ -93,7 +97,10 @@
     (sc/listen imgicon :mouse-clicked
                (fn [e]
                  (when (= :calculate (@state/state :click-mode))
-                   (println "click: (" (.getX e) ", " (.getY e) ")"))))
+                   (do
+                     (println "click: (" (.getX e) ", " (.getY e) ")")
+                     (println "polygon: "
+                              (g/find-polygon @state/state (.getX e) (.getY e)))))))
     ;; add mouse coords to label in bottom panel
     (sc/listen imgicon :mouse-moved
                (fn [e]
@@ -110,7 +117,7 @@
   (let [width (sc/select root [:#stroke])
         color (sc/select root [:#foreground])
         mode (sc/select root [:#polygons])]
-    (sc/selection! width 3)
+    (sc/selection! width 5)
     (sc/selection! color :red)
     (sc/selection! mode true))
   root)
@@ -135,6 +142,17 @@
     (sc/config! this :background value
                   :foreground (if (= :white value) :black :white))
     (sc/config! this :text "None")))
+
+;(defn add-line-text-box [state index]
+;  nil)
+(defn set-poly-for-calculation [state index]
+  "Setup polygon for calculation:
+     * set poly as :selected-polygon (maybe)
+     * decorate each line with a text box for user to enter a length
+     * add text box at centroid for area (user can enter area instead)
+     * (ultimately) enable calculate button"
+  nil)
+
 
 (defn make-gui []
   "Constructs and returns the jframe gui.
