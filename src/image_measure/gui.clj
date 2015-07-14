@@ -51,7 +51,8 @@
    c - component
    g - graphics context
   "
-  (let [{:keys [lines current-line]} @state/state]
+  (let [{:keys [lines current-line]} @state/state
+        label (g/->Label 445 195 18 "3.14159" (sclr/color :black) (sclr/color :white))]
     ;; draw line segments of full lines
     (apply sg/draw g (apply concat lines))
     ;; draw endpoints of full lines
@@ -68,7 +69,11 @@
 
 ;    (g/paint-label g 680 150 "HelloWorld.0" (sclr/color :black) (sclr/color :white))
 ;    (println (g/label-geometry g 445 195 18 "3.14159"))
-    (g/paint-label g 445 195 "3.14159" (sclr/color :black) (sclr/color :white))))
+    (println (g/label-geometry g label))
+    (g/paint-label g label)
+    (g/paint-label g (g/centered-label g label 445.1 195.1))
+;    (g/paint-label g 445 195 "3.14159" (sclr/color :black) (sclr/color :white))
+    ))
 
 ;(def del-last-line-action
 ;  (sc/action :name "delete-last-line"
@@ -93,14 +98,15 @@
       :start (dispatch g/start-new-line)
       :drag  (dispatch g/drag-new-line)
       :finish (dispatch g/finish-new-line))
-    ;; simple click applies to selection of polys in :calculate :click-mode
+    ;; simple click selects polygon in :calculate :click-mode
     (sc/listen imgicon :mouse-clicked
                (fn [e]
                  (when (= :calculate (@state/state :click-mode))
                    (do
+                     (let [selected-poly (g/find-polygon @state/state (.getX e) (.getY e))]
                      (println "click: (" (.getX e) ", " (.getY e) ")")
-                     (println "polygon: "
-                              (g/find-polygon @state/state (.getX e) (.getY e)))))))
+                     (println "polygon: " selected-poly)
+                     (swap! state/state assoc :selected-polygon selected-poly))))))
     ;; add mouse coords to label in bottom panel
     (sc/listen imgicon :mouse-moved
                (fn [e]
@@ -143,8 +149,6 @@
                   :foreground (if (= :white value) :black :white))
     (sc/config! this :text "None")))
 
-;(defn add-line-text-box [state index]
-;  nil)
 (defn set-poly-for-calculation [state index]
   "Setup polygon for calculation:
      * enable line and area selection gui elements
@@ -153,7 +157,8 @@
      * populate dropdown gui with indices so user can enter length of a
          particular line
      "
-  nil)
+  (let [lines ((state :polygons) index)]
+    nil))
 
 
 (defn make-gui []
@@ -175,6 +180,12 @@
                                    :separator
                                    (sc/radio :text "Draw" :selected? true :group click-mode-group)
                                    (sc/radio :text "Calculate" :group click-mode-group)
+                                   :separator
+                                   "Area"
+                                   (sc/text :id :area-input)
+                                   "Line"
+                                   (sc/combobox :id :line-select :model [])
+                                   (sc/text :id :line-length-input)
                                    :separator
                                    "Width"
                                    (sc/combobox :id :stroke :class :style :model [1 2 3 5 8 13 21])
