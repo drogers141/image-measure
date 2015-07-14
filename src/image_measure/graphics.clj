@@ -353,39 +353,3 @@
         x (int (- cx (* 0.5 (geo :width))))
         y (int (- cy (* 0.5 (geo :height))))]
     (Label. x y (:fontsize l) (:text l) (:fg l) (:bg l))))
-
-;(defn label-geometry [g x y fontsize text]
-;  "Returns map of geometry of label created from string text at x, y
-;   g - graphics context
-;   x, y - top left of outside of label
-;   fontsize - size of font
-;   returns map { :x <x> :y <y>
-;      :width <full width> :height <full height>
-;      :text-height <height of string> :text-width <width of string>
-;      :string-x <x for drawString> :string-y <y for drawString> }
-;
-;   Note - x + width and y + height appear to not take into account stroke
-;   of outside rectangle of label - ie 2-3 pixels shy"
-;  (let [font (sfont/font :name :sans-serif :size fontsize)
-;       metrics (.getFontMetrics g font)
-;       twidth (.stringWidth metrics text)
-;       theight (.getHeight metrics)
-;       wpad (* 0.25 theight)
-;       hpad (* 0.125 theight)]
-;    {:x x :y y :width (int (+ twidth (* 2 wpad))) :height (int (+ theight (* 2 hpad)))
-;     :text-width twidth :text-height theight
-;     :string-x (int (+ x wpad)) :string-y (int (+ y theight))}))
-
-;(defn paint-label [^java.awt.Graphics2D g x y text fg bg]
-;  (let [stroke (sg/stroke :width 2 :join :round)
-;       fontsize 18
-;       font (sfont/font :name :sans-serif :size fontsize)
-;       geo (label-geometry g x y fontsize text)]
-;    (doto g
-;      (.setFont font)
-;      (.setColor bg)
-;      (.fillRect x y (geo :width) (geo :height))
-;      (.setColor fg)
-;      (.drawString text (geo :string-x) (geo :string-y))
-;      (.setStroke stroke)
-;      (.drawRect x y (geo :width) (geo :height)))))
