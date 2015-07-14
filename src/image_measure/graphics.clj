@@ -230,7 +230,8 @@
    (possibly starting/finishing the polygon)."
   (let [new-state (-> state
                     (update-in [:lines] conj (:current-line state))
-                    (assoc :current-line nil))]
+                    (assoc :current-line nil)
+                    (assoc :start-point nil))]
     (if (= (state :mode) :polygons)
       (if (state :current-polygon)
         (do

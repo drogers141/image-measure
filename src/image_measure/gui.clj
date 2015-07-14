@@ -147,10 +147,12 @@
 ;  nil)
 (defn set-poly-for-calculation [state index]
   "Setup polygon for calculation:
-     * set poly as :selected-polygon (maybe)
-     * decorate each line with a text box for user to enter a length
-     * add text box at centroid for area (user can enter area instead)
-     * (ultimately) enable calculate button"
+     * enable line and area selection gui elements
+     * enable calculate button
+     * label each line with index
+     * populate dropdown gui with indices so user can enter length of a
+         particular line
+     "
   nil)
 
 
