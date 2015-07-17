@@ -25,14 +25,6 @@
 ;; /Users/drogers/Desktop/images-craigslist/floorplan.jpg
 ;; /Users/drogers/Desktop/images-craigslist/cottage.jpg
 
-;;**** TODO - REMOVE ALONG WITH :mode stuff ***
-(defn switch-mode [state source]
-  "Switch the application mode in state - ie Lines/Polygons
-   state - current app state map
-   source - widget"
-  (let [selected? (sc/selection source)]
-    (assoc state :mode (if selected? (sc/id-of source)))))
-
 (defn dispatch  [handler]
   "Returns event handler based on param that manipulates app state.
    ** ACCESSES GLOBAL STATE: @state/state **
@@ -92,10 +84,10 @@
 
 (defn add-behaviors [root]
   (let [imgicon (sc/select root [:#image-label])
-        modes (sc/button-group :buttons (sc/select root [:.mode]))
+;        modes (sc/button-group :buttons (sc/select root [:.mode]))
         styles (sc/select root [:.style])
         delete-last-button (sc/select root [:#delete-last-button])]
-    (sc/listen modes :selection #(swap! state/state switch-mode %))
+;    (sc/listen modes :selection #(swap! state/state switch-mode %))
     (sc/listen delete-last-button
                :action (fn [actevent]
                           (swap! state/state g/delete-last-line)
@@ -132,8 +124,7 @@
         color (sc/select root [:#foreground])
         mode (sc/select root [:#polygons])]
     (sc/selection! width 5)
-    (sc/selection! color :red)
-    (sc/selection! mode true))
+    (sc/selection! color :red))
   root)
 
 ;(def floorplan-img "/Users/drogers/Desktop/images-craigslist/floorplan.jpg")
@@ -183,10 +174,7 @@
             (sc/border-panel :hgap 5 :vgap 5 :border 5
                          :north (sc/toolbar
                            :floatable? false
-                           :items [(sc/toggle :id :lines     :class :mode :text "Lines")
-                                   (sc/toggle :id :polygons  :class :mode :text "Polygons")
-                                   :separator
-                                   (sc/radio :text "Draw" :selected? true :group click-mode-group)
+                           :items [(sc/radio :text "Draw" :selected? true :group click-mode-group)
                                    (sc/radio :text "Calculate" :group click-mode-group)
                                    :separator
                                    "Area"

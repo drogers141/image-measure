@@ -196,15 +196,12 @@
      (vec (map first (filter (fn [[_ v]] (= 1 v)) counts)))))
 
 (defn start-new-line [state e]
-  "Start a new line - in polygon mode if there is a current polygon
-   a new line can only be started from one of its endpoints."
+  "Start a new line - if there is a current polygon a new line can only
+   be started from one of its endpoints."
   (let [p (.getPoint e)]
-;    (log/info "state: " state)
-    (if (= (state :mode) :polygons)
-      (do
-;        (log/info "polygon mode")
-        ;; if current poly - line must start from an endpoint
-        (if (and (state :current-polygon) (pos? (count (state :current-polygon))))
+    (do
+      ;; if current poly - line must start from an endpoint
+      (if (and (state :current-polygon) (pos? (count (state :current-polygon))))
           (let [endpts (end-points state (state :current-polygon))
                 close-pt (first (filter #(points-close-enough p %) endpts))]
             (log/info "** start-new-line: current polygon **")
@@ -219,11 +216,7 @@
               state))
           (assoc state
              :start-point [(.x p) (.y p)]
-             :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
-      ;; not polygon mode, just start new line
-      (assoc state
-             :start-point [(.x p) (.y p)]
-             :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)]))))
+             :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))))
 
 (defn drag-new-line [state e [dx dy]]
   "New line has been started - add to it."

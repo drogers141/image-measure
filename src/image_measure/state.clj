@@ -41,8 +41,6 @@
   :current-polygon-color nil
   ;; color of lines in finished polygons that you can select for calculation
   :finished-polygon-color (color/color 0 216 0)
-  ;; current mode - one of :lines :polygons
-  :mode nil
   ;; click-mode - either :draw or :calculate
   ;; what happens when you click on the image
   ;; :draw - click and drag to create the :current-polygon
@@ -51,9 +49,6 @@
   ;;     clicking on a line or point belonging to one will
   ;;     show empty labels for the lines and area calculations
   ;;     the user can then fill in whatever data and click "Calculate"
-  ;;
-  ;; will phase out :lines or :polygons values for :mode and may rename
-  ;; this to :mode
   :click-mode :draw})
 
 ;; GLOBAL APPLICATION STATE
