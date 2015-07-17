@@ -29,8 +29,11 @@
   :selected-polygon nil
   ;; custom rendered labels at midpoints of lines or in the centroid
   ;; of a polygon displaying numeric values
-  ;; each label is described by a map with keys
-  ;; {x  y  fontsize  text  polygon <index of poly>}
+  ;; each label entry contains the label and an index of either
+  ;; a line if it is a line label, or a polygon if it is an area label
+  ;; ie one of:
+  ;; {:label <Label record> :line <index>}
+  ;; {:label <Label record> :polygon <index>}
   :labels []
   ;; current style - graphics.Style
   :style  (sg/style :color :black :stroke nil)

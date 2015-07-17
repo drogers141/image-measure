@@ -9,7 +9,8 @@
            [seesaw.color :as sclr]
            [seesaw.graphics :as sg]
            [seesaw.behave :as behave]
-           [seesaw.font :as sfont])
+           [seesaw.font :as sfont]
+           [image-measure.geo :as geo])
  (:import [java.awt.geom Line2D, Point2D, Point2D$Double]
           [java.awt.Color]))
 
@@ -162,6 +163,30 @@
           (let [[new-o new-r] (select-next state false ordered remaining)]
             (recur new-o new-r)))))))
 
+(defn ordered-poly-points [state poly]
+  "Same input as ordered-polygon - returns the unique points in order
+   as doubles in the form [[x1 y1] [x2 y2] ..]"
+  (let [ordered (ordered-polygon state poly)
+        all-pts (map #(get-points (line-from-index state %)) ordered)
+        first-pt (if ((set (second all-pts)) (first (first all-pts)))
+                    (second (first all-pts))
+                    (first (first all-pts)))
+         second-pt (get-other-pt (line-from-index state (first ordered))
+                                   first-pt)]
+    (loop [points [first-pt second-pt]
+           remaining (rest all-pts)]
+      (if (seq remaining)
+        (let [line (first remaining)
+              is-first (= -1 (.indexOf points (line 0)))]
+          (if is-first
+            (recur (conj points (line 0)) (rest remaining))
+            (recur (conj points (line 1)) (rest remaining))))
+        ;; last point is repeated - easier to just remove here than rework
+        (let [v (vec (map #(vec [(.getX %) (.getY %)]) points))]
+          (subvec v 0 (dec (count v))))))))
+
+
+
 (defn end-points [state partial-poly]
   "Given partial polygon returns the 2 endpoints in a vector.
    Returns empty vector for complete polygon."
@@ -179,7 +204,7 @@
       (do
 ;        (log/info "polygon mode")
         ;; if current poly - line must start from an endpoint
-        (if (state :current-polygon)
+        (if (and (state :current-polygon) (pos? (count (state :current-polygon))))
           (let [endpts (end-points state (state :current-polygon))
                 close-pt (first (filter #(points-close-enough p %) endpts))]
             (log/info "** start-new-line: current polygon **")
@@ -202,10 +227,12 @@
 
 (defn drag-new-line [state e [dx dy]]
   "New line has been started - add to it."
-  (let [p (.getPoint e)
-        [start-x start-y] (:start-point state)]
-    (assoc state :current-line
-           [(sg/line start-x start-y (.x p) (.y p)) (:style state)])))
+  (if (state :current-line)
+    (let [p (.getPoint e)
+          [start-x start-y] (:start-point state)]
+      (assoc state :current-line
+             [(sg/line start-x start-y (.x p) (.y p)) (:style state)]))
+    state))
 
 (defn close-current-polygon [state]
   "Call this if you have points-close-enough with the end-points of the
@@ -213,18 +240,18 @@
    Replaces the last line with one that has as its last point the shared
    point in the polygon.
    Returns updated state."
-  (let [endpts (end-points state (state :current-polygon))
-        last-line-index ((state :current-polygon) (dec (count (state :current-polygon))))
-        last-line (line-from-index state last-line-index)
-        last-line-pts (get-points last-line)
-        keep-pt (first (filter #(not (points-close-enough (endpts 0) %)) last-line-pts))
-        other-pt (first (filter #(not= (get-other-pt last-line keep-pt) %) endpts))
-        new-line (sg/line (.getX keep-pt) (.getY keep-pt) (.getX other-pt) (.getY other-pt))
-        new-state (assoc-in state [:lines last-line-index 0] new-line)]
+  (let [endpts (end-points state (state :current-polygon))]
     ;; nothing to do if end points are already the same point
-    (if (= (endpts 0) (endpts 1))
+    (if (zero? (count endpts))
       state
-      new-state)))
+      (let [last-line-index ((state :current-polygon) (dec (count (state :current-polygon))))
+            last-line (line-from-index state last-line-index)
+            last-line-pts (get-points last-line)
+            keep-pt (first (filter #(not (points-close-enough (endpts 0) %)) last-line-pts))
+            other-pt (first (filter #(not= (get-other-pt last-line keep-pt) %) endpts))
+            new-line (sg/line (.getX keep-pt) (.getY keep-pt) (.getX other-pt) (.getY other-pt))
+            new-state (assoc-in state [:lines last-line-index 0] new-line)]
+        new-state))))
 
 (defn finish-new-line [state e]
   "Finish newly drawn line.  In polygon mode add it to the current polygon
@@ -233,21 +260,20 @@
                     (update-in [:lines] conj (:current-line state))
                     (assoc :current-line nil)
                     (assoc :start-point nil))]
-    (if (= (state :mode) :polygons)
+    (if (state :current-line)
       (if (state :current-polygon)
         (do
           (let [updated-state (add-latest-line-to-current-polygon new-state)
                 endpts (end-points updated-state (updated-state :current-polygon))]
             ;; close enough end points means completed polygon
-            (log/info "** finish-new-line: :current-polygon **")
-            (log/info "endpts: " endpts)
+            (log/info "** finish-new-line: :current-polygon - endpts: " endpts)
             (cond
               (nil? endpts)
               (do
                 (log/info "** finish-new-line: endpts nil")
                 new-state)
-              (apply points-close-enough endpts)
-                ;; end points are close enough - close polygon and finish it
+              ;; end points are close enough or exact - close polygon and finish it
+              (or (zero? (count endpts)) (apply points-close-enough endpts))
               (do
                 (log/info "** finish-new-line: finish poly - endpts: " endpts)
                 (finish-polygon (close-current-polygon updated-state)))
@@ -257,8 +283,9 @@
                 updated-state))))
         ;; no :current-polygon so start it with this line
         (start-new-polygon new-state))
-      ;; not :polygons mode, just add the line
-      new-state)))
+      ;; no current-line being drawn - no-op
+      state)))
+
 
 
 (defn update-line-style [state source]
@@ -310,9 +337,13 @@
 (defrecord Label [x y fontsize ^String text
                   ^java.awt.Color fg ^java.awt.Color bg])
 
+(defn label [x y fontsize text]
+  "Convenience - black and white label."
+  (Label. x y fontsize text (sclr/color :black) (sclr/color :white)))
+
 (defn label-geometry [^java.awt.Graphics2D g ^Label l]
   "Returns map of geometry of label created from string text at x, y
-   g - graphics context
+   g - graphics context for calculating geometry of label
    x, y - top left of outside of label
    fontsize - size of font
    returns map { :x <x> :y <y>
@@ -334,6 +365,7 @@
      :string-x (int (+ (:x l) wpad)) :string-y (int (+ (:y l) theight))}))
 
 (defn paint-label [^java.awt.Graphics2D g ^Label l]
+  "g - graphics context for calculating geometry of label "
   (let [stroke (sg/stroke :width 2 :join :round)
        font (sfont/font :name :sans-serif :size (:fontsize l))
        geo (label-geometry g l)]
@@ -348,8 +380,35 @@
 
 (defn centered-label [^java.awt.Graphics2D g ^Label l cx cy]
   "Returns copy of Label l with its x, y adjusted so it is centered
-   on cx, cy"
+   on cx, cy
+   g - graphics context for calculating geometry of label"
   (let [geo (label-geometry g l)
         x (int (- cx (* 0.5 (geo :width))))
         y (int (- cy (* 0.5 (geo :height))))]
     (Label. x y (:fontsize l) (:text l) (:fg l) (:bg l))))
+
+(defn remove-line-label [state index]
+  "Clear label on line with index index if there is one."
+  (assoc-in state [:labels]
+            (vec (filter #(not= (get % :line) index) (state :labels)))))
+
+(defn remove-poly-center-label [state index]
+  "Clear label at center of poly with index index if there is one."
+  nil)
+
+(defn label-line [state ^java.awt.Graphics2D g index ^Label label]
+  "Places label centered on midpoint of line with index index.
+   g - graphics context for calculating geometry of label"
+  (let [points (get-points (line-from-index state index))
+        midpt (apply geo/midpoint (flatten (map #(vec [(.getX %) (.getY %)]) points)))
+        l (centered-label g label (midpt 0) (midpt 1))]
+    (assoc-in state [:labels] (conj (state :labels) {:label l :line index}))))
+
+(defn label-poly-center [state ^java.awt.Graphics2D g index ^Label label]
+  "Places label centered on centroid of poly with index index.
+   g - graphics context for calculating geometry of label"
+  (let [poly (get (:polygons state) index)
+        points (ordered-poly-points state poly)
+        [cx cy] (geo/centroid points)
+        cl (centered-label g label cx cy)]
+    (assoc-in state [:labels] (conj (state :labels) {:label cl :polygon index}))))
