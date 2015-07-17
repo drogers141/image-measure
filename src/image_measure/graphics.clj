@@ -399,17 +399,21 @@
 
 (defn label-line [state ^java.awt.Graphics2D g index ^Label label]
   "Places label centered on midpoint of line with index index.
+   Clears any previous label for line.
    g - graphics context for calculating geometry of label"
   (let [points (get-points (line-from-index state index))
         midpt (apply geo/midpoint (flatten (map #(vec [(.getX %) (.getY %)]) points)))
-        l (centered-label g label (midpt 0) (midpt 1))]
-    (assoc-in state [:labels] (conj (state :labels) {:label l :line index}))))
+        l (centered-label g label (midpt 0) (midpt 1))
+        state1 (remove-line-label state index)]
+    (assoc-in state1 [:labels] (conj (state1 :labels) {:label l :line index}))))
 
 (defn label-poly-center [state ^java.awt.Graphics2D g index ^Label label]
   "Places label centered on centroid of poly with index index.
+   Clears any previous center label for polygon.
    g - graphics context for calculating geometry of label"
   (let [poly (get (:polygons state) index)
         points (ordered-poly-points state poly)
         [cx cy] (geo/centroid points)
-        cl (centered-label g label cx cy)]
-    (assoc-in state [:labels] (conj (state :labels) {:label cl :polygon index}))))
+        cl (centered-label g label cx cy)
+        state1 (remove-poly-center-label state index)]
+    (assoc-in state1 [:labels] (conj (state1 :labels) {:label cl :polygon index}))))
