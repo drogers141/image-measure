@@ -417,3 +417,18 @@
         cl (centered-label g label cx cy)
         state1 (remove-poly-center-label state index)]
     (assoc-in state1 [:labels] (conj (state1 :labels) {:label cl :polygon index}))))
+
+(defn label-poly-for-calculation [state ^java.awt.Graphics2D g index]
+  "index - index of poly in state
+   * label each line in polygon with its index
+   * label center of polygon for area"
+  (let [lines ((state :polygons) index)
+        polylabel (label 0 0 18 "Area")
+        state1 (label-poly-center state g index polylabel)]
+    (loop [s state1
+           rem-lines lines]
+      (if (seq rem-lines)
+        (let [i (first rem-lines)
+              l (label 0 0 18 (str i))]
+          (recur (label-line s g i l) (rest rem-lines)))
+        s))))

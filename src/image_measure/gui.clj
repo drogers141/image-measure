@@ -157,7 +157,7 @@
                   :foreground (if (= :white value) :black :white))
     (sc/config! this :text "None")))
 
-(defn set-poly-for-calculation [state index]
+(defn set-poly-for-calculation [state ^java.awt.Graphics2D g index]
   "Setup polygon for calculation:
      * enable line and area selection gui elements
      * enable calculate button
