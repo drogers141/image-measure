@@ -394,7 +394,8 @@
 
 (defn remove-poly-center-label [state index]
   "Clear label at center of poly with index index if there is one."
-  nil)
+  (assoc-in state [:labels]
+            (vec (filter #(not= (get % :polygon) index) (state :labels)))))
 
 (defn label-line [state ^java.awt.Graphics2D g index ^Label label]
   "Places label centered on midpoint of line with index index.
