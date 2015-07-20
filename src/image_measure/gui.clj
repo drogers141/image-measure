@@ -157,12 +157,19 @@
                :action (fn [e]
                          (let [area (sc/config area-txt :text)
                                line (sc/selection line-select)
-                               line-len (sc/config line-txt :text)]
+                               line-len (sc/config line-txt :text)
+                               poly-index (@state/state :selected-polygon)
+                               g (.getGraphics root)]
                            (cond
                              (and (pos? (count area)) (pos? (count line-len)))
                              (sc/alert "Can only calculate based on area or the length of a line. Not both.")
                              (pos? (count line-len))
-                             (println "calculate for line: " line ", length: " line-len)
+                             ;; ** todo maybe - detect bad input **
+                             (let [results (calculate-from-length poly-index line
+                                                                  (Double/parseDouble line-len))]
+                               (swap! state/state g/label-poly-with-results g poly-index results)
+                               (sc/repaint! imgicon))
+;                             (println "calculate for line: " line ", length: " line-len)
                              (pos? (count area))
                              (println "calculate for area: " area)))))
 
