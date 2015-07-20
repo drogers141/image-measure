@@ -1,6 +1,8 @@
 (ns image-measure.geo
  "Geometry and math functionality - pure functions."
- (:require [clojure.math.numeric-tower :as math]))
+ (:require [clojure.math.numeric-tower :as math])
+ (:import [java.awt.geom Line2D]))
+
 
 (defn distance
   "Distance between two points."

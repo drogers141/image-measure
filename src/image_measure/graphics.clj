@@ -54,6 +54,11 @@
     (.getP2 l)
     (.getP1 l)))
 
+(defn line2d-to-xy [^Line2D l]
+  "Returns [x1 y1 x2 y2] from Line2D."
+  (let [pts (get-points l)]
+    (vec (flatten (map #(vec [(.getX %) (.getY %)]) pts)))))
+
 (defn ^Line2D line-from-index [state index]
   (((state :lines) index) 0))
 
@@ -423,5 +428,24 @@
       (if (seq rem-lines)
         (let [i (first rem-lines)
               l (label 0 0 18 (str i))]
+          (recur (label-line s g i l) (rest rem-lines)))
+        s))))
+
+(defn label-poly-with-results [state ^java.awt.Graphics2D g index results]
+  "Label polygon with results of calculating lengths and area.
+   index - index of poly
+   results - map with results of calculation in form
+     {:area <poly-area> index1 <length-line1> index2 <length-line2>}
+   ** Formatting with single digit precision for now **
+   ** Defaulting to 18 as fontsize for now as well **"
+  (let [lines ((state :polygons) index)
+        make-label (fn [val] (label 0 0 18 (format "%.1f" val)))
+        polylabel (make-label (results :area))
+        state1 (label-poly-center state g index polylabel)]
+    (loop [s state1
+           rem-lines lines]
+      (if (seq rem-lines)
+        (let [i (first rem-lines)
+              l (make-label (results i))]
           (recur (label-line s g i l) (rest rem-lines)))
         s))))
