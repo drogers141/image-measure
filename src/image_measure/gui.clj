@@ -137,6 +137,50 @@
         area (calculate-scaled-area indices line-index length)]
     (assoc lengths :area area)))
 
+(defn calculate-from-area [poly-index area]
+  "Calculates length of all lines of polygon given the area.
+   poly-index - index of polygon to work with
+   area - given scaled area of polygon
+   Returns map {:area 0 1 ..} with the area of the polygon and length of
+   each line keyed to its index.
+   ** Access global state: state/state **"
+  ;; iterative method used to approximate within a tolerance
+  (let [tolerance 0.01
+        indices (get (@state/state :polygons) poly-index)
+        line-index (first indices)]
+    (loop [len-i (Math/sqrt area)
+           len-lo nil
+           len-hi nil]
+      (let [area-i (calculate-scaled-area indices line-index len-i)]
+        (cond
+          ;; if within tolerance return results using line and length
+          (> tolerance (Math/abs (- area-i area)))
+          (calculate-from-length poly-index line-index len-i)
+          ;; otherwise bisect current approximation of length with
+          ;; prior high and low values or double or half current val if n/a
+          (< area-i area)
+          (let [len-lo len-i]
+;            (log/info "lower - len-i: " len-i ", area-i: " area-i)
+            (if (nil? len-hi)
+              (recur (* 2 len-i) len-lo nil)
+              (recur (/ (+ len-lo len-hi) 2) len-lo len-hi)))
+          :else
+          (let [len-hi len-i]
+;            (log/info "higher - len-i: " len-i ", area-i: " area-i)
+            (if (nil? len-lo)
+              (recur (/ len-i 2.0) nil len-hi)
+              (recur (/ (+ len-lo len-hi) 2) len-lo len-hi))))))))
+
+(defn numeric-input? [val]
+  "Returns val as double if it can be parsed as double.
+   If non-numeric alerts user with dialog before returning false."
+  (try
+    (Double/parseDouble val)
+    (catch NumberFormatException e
+      (sc/alert (format "\"%s\": input needs to be numeric." val))
+      false)
+    (finally false)))
+
 (defn add-behaviors [root]
   "Add functionality to widgets using Seesaw's selection.
    root - root widget of gui
@@ -164,11 +208,11 @@
                              (and (pos? (count area)) (pos? (count line-len)))
                              (sc/alert "Can only calculate based on area or the length of a line. Not both.")
                              (pos? (count line-len))
-                             ;; ** todo maybe - detect bad input **
-                             (let [results (calculate-from-length poly-index line
-                                                                  (Double/parseDouble line-len))]
-                               (swap! state/state g/label-poly-with-results g poly-index results)
-                               (sc/repaint! imgicon))
+                             (when (numeric-input? line-len)
+                               (let [results (calculate-from-length poly-index line
+                                                                    (Double/parseDouble line-len))]
+                                 (swap! state/state g/label-poly-with-results g poly-index results)
+                                 (sc/repaint! imgicon)))
 ;                             (println "calculate for line: " line ", length: " line-len)
                              (pos? (count area))
                              (println "calculate for area: " area)))))
