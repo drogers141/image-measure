@@ -15,14 +15,6 @@
 
 (def colors [:black :white :red :blue :yellow :green :orange :purple nil])
 
-
-
-;(defn red-x-icon []
-;  (let [icon (get-icon)]
-;    (sc/config! icon :paint draw-a-red-x)
-;    icon))
-
-
 ;; /Users/drogers/Desktop/images-craigslist/floorplan.jpg
 ;; /Users/drogers/Desktop/images-craigslist/cottage.jpg
 
@@ -181,19 +173,59 @@
       false)
     (finally false)))
 
+(defn print-state
+  "Pretty print parts or all of state.  Default prints lines out in
+   compact string form."
+;  ([] (pprint @state/state))
+  ([] (do
+        (pprint (for [k (keys @state/state) :when (not= k :lines)]
+            {k (@state/state k)}))
+        (println (format "lines:\n%s" (g/lines-as-str @state/state)))))
+  ([k] (pprint (@state/state k))))
+
+(defn init-selections! [root]
+  "Set initial selections as needed - triggers state update.
+   root - root component
+   returns root"
+  (let [draw-radio (sc/select root [:#draw-radio])
+        width (sc/select root [:#stroke])
+        ;; leaving for now - see commented out section in create-gui
+;        color (sc/select root [:#foreground])
+        ]
+    (sc/config! draw-radio :selected? true)
+    (sc/selection! width 5)
+;    (sc/selection! color :red)
+    ;; hard set foreground drawing color to red
+    ;; replace if we go back to giving color choice
+    (swap! state/state assoc-in [:style :foreground] (sclr/color :red))
+  root))
+
+(defn reset-state! [root]
+  "Reset application state
+   ** MANIPULATES GLOBAL STATE: @state/state **
+   root - root component of gui as far as seesaw is concerned"
+  (reset! state/state (state/clean-state))
+  (init-selections! root)
+  (sc/repaint! root))
+
+
 (defn add-behaviors [root]
   "Add functionality to widgets using Seesaw's selection.
    root - root widget of gui
    Returns root."
   (let [imgicon (sc/select root [:#image-label])
         styles (sc/select root [:.style])
-        delete-last-button (sc/select root [:#delete-last-button])
+        clear-all-btn (sc/select root [:#clear-all-btn])
+        delete-last-btn (sc/select root [:#delete-last-btn])
         calculate-btn (sc/select root [:#calculate-btn])
         area-txt (sc/select root [:#area-input])
         line-select (sc/select root [:#line-select])
         line-txt (sc/select root [:#line-length-input])
         ]
-    (sc/listen delete-last-button
+    (sc/listen clear-all-btn
+               :action (fn [actevent]
+                         (reset-state! root)))
+    (sc/listen delete-last-btn
                :action (fn [actevent]
                           (swap! state/state g/delete-last-line)
                           (sc/repaint! imgicon)))
@@ -213,9 +245,12 @@
                                                                     (Double/parseDouble line-len))]
                                  (swap! state/state g/label-poly-with-results g poly-index results)
                                  (sc/repaint! imgicon)))
-;                             (println "calculate for line: " line ", length: " line-len)
                              (pos? (count area))
-                             (println "calculate for area: " area)))))
+                             (when (numeric-input? area)
+                               (let [results (calculate-from-area poly-index
+                                                                  (Double/parseDouble area))]
+                                 (swap! state/state g/label-poly-with-results g poly-index results)
+                                 (sc/repaint! imgicon)))))))
 
     (sc/listen styles :selection #(swap! state/state g/update-line-style %))
     ;; click and drag applies in :draw :click-mode
@@ -242,31 +277,15 @@
     (doseq [s styles] #(swap! state/state g/update-line-style s)))
   root)
 
-(defn init-selections! [root]
-  "Set initial selections as needed - triggers state update.
-   root - root component
-   returns root"
-  (let [width (sc/select root [:#stroke])
-        ;; leaving for now - see commented out section in create-gui
-;        color (sc/select root [:#foreground])
-        ]
-    (sc/selection! width 5)
-;    (sc/selection! color :red)
-    ;; hard set foreground drawing color to red
-    ;; replace if we go back to giving color choice
-    (swap! state/state assoc-in [:style :foreground] (sclr/color :red))
-    )
-  root)
-
-;(def floorplan-img "/Users/drogers/Desktop/images-craigslist/floorplan.jpg")
-(def floorplan-img "/Users/drogers/Desktop/images-craigslist/floorplan-w-1000.jpg")
-
-(defn get-image-label []
-  (let [icon (ImageIcon. (io/as-url (str "file://" floorplan-img)) "describe me")
+(defn get-image-label [image-file]
+  "Returns image component of gui.
+   image-file - full path to image to work with"
+  (let [icon (ImageIcon. (io/as-url (str "file://" image-file)) "describe me")
         label (sc/label :id :image-label :paint render)]
     (.setIcon label icon)
     label))
 
+;; (currently unused but keeping around for now)
 ;; cell renderer - for comboboxes that list colors paints the
 ;; background that color - taken from Dave Ray's scribble example
 ;; as he notes below - OS X does not show the color for the current
@@ -279,8 +298,9 @@
                   :foreground (if (= :white value) :black :white))
     (sc/config! this :text "None")))
 
-(defn make-gui []
+(defn make-gui [image-file]
   "Constructs and returns the jframe gui.
+   image-file - full path to image to work with
    ** MANIPULATES GLOBAL STATE: @state/state **"
   ;; Swing native look and feel
   (sc/native!)
@@ -293,13 +313,14 @@
             (sc/border-panel :hgap 5 :vgap 5 :border 5
                          :north (sc/toolbar
                            :floatable? false
-                           :items [(sc/radio :text "Draw" :selected? true :group click-mode-group)
+                           :items [(sc/radio :id :draw-radio :text "Draw" :selected? true :group click-mode-group)
                                    (sc/radio :text "Calculate" :group click-mode-group)
                                    :separator
                                    "Area"
                                    (sc/text :id :area-input :columns 12 :enabled? false)
                                    "Line"
                                    (sc/combobox :id :line-select :model [] :enabled? false)
+                                   "Line Length"
                                    (sc/text :id :line-length-input :columns 12 :enabled? false)
                                    (sc/button :id :calculate-btn :text "Calculate" :enabled? false)
                                    :separator
@@ -312,13 +333,13 @@
 ;                                   (sc/combobox :id :foreground :class :style :model colors :renderer color-cell)
                                    ])
                           ; Create the drawing surface over an image held by an image label
-                          :center (get-image-label)
+                          :center (get-image-label image-file)
 
                           :south (sc/horizontal-panel :id :south-panel
-                                      :items ["Here's a label "
-                                                "And another"
-                                                (sc/button :text "Delete last"
-                                                           :id :delete-last-button)
+                                      :items [(sc/button :id :clear-all-btn
+                                                         :text "Clear All")
+                                                (sc/button :text "Delete Last Line"
+                                                           :id :delete-last-btn)
                                                 (sc/label :id :mouse-coords)])))]
 
     (sc/listen click-mode-group :action
@@ -328,33 +349,18 @@
             (swap! state/state assoc :click-mode :calculate))))
     gui))
 
-(defn print-state
-  "Pretty print parts or all of state.  Default prints lines out in
-   compact string form."
-;  ([] (pprint @state/state))
-  ([] (do
-        (pprint (for [k (keys @state/state) :when (not= k :lines)]
-            {k (@state/state k)}))
-        (println (format "lines:\n%s" (g/lines-as-str @state/state)))))
-  ([k] (pprint (@state/state k))))
-
-(defn reset-state! [root]
-  "Reset application state
-   ** MANIPULATES GLOBAL STATE: @state/state **
-   root - root component of gui as far as seesaw is concerned"
-  (reset! state/state (state/clean-state))
-  (init-selections! root)
-  (sc/repaint! root))
-
-(defn run-gui []
-  "** ACCESSES GLOBAL STATE: @state/state **"
-  (let [gui (make-gui)]
+(defn run-gui [image-file]
+  "Entry point that returns gui reference.
+   image-file - full path to image to work with
+   ** ACCESSES GLOBAL STATE: @state/state **"
+  (let [gui (make-gui image-file)]
     (reset! state/state (state/clean-state))
     (sc/config! gui :on-close :dispose)
     (sc/invoke-later
       (-> gui add-behaviors init-selections! sc/pack! sc/show!))
     gui))
 
-(defn -main []
+(defn -main [image-file]
+  "image-file - full path to image to work with"
   (sc/invoke-later
-    (-> (make-gui) add-behaviors init-selections! sc/pack! sc/show!)))
+    (-> (make-gui image-file) add-behaviors init-selections! sc/pack! sc/show!)))
