@@ -8,4 +8,5 @@
                  [org.clojure/tools.logging "0.3.1"]
                  [org.clojure/math.numeric-tower "0.0.4"]
                  [org.clojure/tools.cli "0.3.1"]]
-  :main image-measure.core)
+  :main image-measure.core
+  :aot [image-measure.core])

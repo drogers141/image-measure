@@ -293,23 +293,22 @@
 (defn delete-last-line [state]
   "Delete the last completed line in saved state.
    Removes line from current-polygon if applicable.
-
-   Todo maybe:
-      - deleting last line from :current-polygon leaves it as an empty vec
-        - not nil - might want to change
-      - deleting from a closed polygon is not handled as far as polygons go
-
+   Does not delete line if in any finished polygons.
    state - current state
    Returns new state."
-  (if (< 0 (count (state :lines)))
+  ;; disregard if no lines
+  (if (zero? (count (state :lines)))
+    state
     (let [index (dec (count (state :lines)))
-  ;        new-current-poly (vec (remove-first index (state :current-polygon)))
-          state2 (update-in state [:lines] pop)]
-      (if (get state2 :current-polygon)
-        (assoc state2 :current-polygon
-               (vec (remove-first index (state :current-polygon))))
-        state2))
-    state))
+          inpoly #(not= -1 (.indexOf % index))]
+      ;; don't delete if last line is in finished polygon
+      (if (some inpoly (state :polygons))
+        state
+        (let [state2 (update-in state [:lines] pop)]
+          (if (get state2 :current-polygon)
+            (assoc state2 :current-polygon
+                   (vec (remove-first index (state :current-polygon))))
+            state2))))))
 
 (defn line-intersects [state index x y]
   "Returns true if the line with index index in state intersects with point
