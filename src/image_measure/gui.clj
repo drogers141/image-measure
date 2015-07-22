@@ -189,11 +189,15 @@
    returns root"
   (let [draw-radio (sc/select root [:#draw-radio])
         width (sc/select root [:#stroke])
+        area-txt (sc/select root [:#area-input])
+        line-txt (sc/select root [:#line-length-input])
         ;; leaving for now - see commented out section in create-gui
 ;        color (sc/select root [:#foreground])
         ]
     (sc/config! draw-radio :selected? true)
     (sc/selection! width 5)
+    (sc/config! area-txt :text "")
+    (sc/config! line-txt :text "")
 ;    (sc/selection! color :red)
     ;; hard set foreground drawing color to red
     ;; replace if we go back to giving color choice
@@ -244,12 +248,14 @@
                                (let [results (calculate-from-length poly-index line
                                                                     (Double/parseDouble line-len))]
                                  (swap! state/state g/label-poly-with-results g poly-index results)
+                                 (sc/config! line-txt :text "")
                                  (sc/repaint! imgicon)))
                              (pos? (count area))
                              (when (numeric-input? area)
                                (let [results (calculate-from-area poly-index
                                                                   (Double/parseDouble area))]
                                  (swap! state/state g/label-poly-with-results g poly-index results)
+                                 (sc/config! area-txt :text "")
                                  (sc/repaint! imgicon)))))))
 
     (sc/listen styles :selection #(swap! state/state g/update-line-style %))
