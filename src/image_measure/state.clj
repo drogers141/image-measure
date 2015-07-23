@@ -14,7 +14,12 @@
 ;;              2 points
 ;;          - only 1 active polygon at a time - kept in state as
 ;;          :current-polygon
-;;
+;;          - once polygons are finished they are stored as indices in
+;;             :polygons
+;; Once a line is associated with a polygon it is always associated with it
+;; Lines and polygons may be in state at the same time - they will have
+;;    different colors, and calculation occurs for either a selected polygon
+;;    or the set of all free lines
 (defn clean-state []
   {
   ;; lines [[Line2D graphics.Style] ..]
@@ -41,8 +46,19 @@
   :current-polygon-color nil
   ;; color of lines in finished polygons that you can select for calculation
   :finished-polygon-color (color/color 0 216 0)
+  ;; mode - either :lines or :polygons
+  ;;    what happens when you draw or click the calculate button
+  ;; :polygons - in :draw click-mode all lines drawn are part of the
+  ;;     current polygon - see below
+  ;;     - in :calculate click-mode, selecting a polygon by clicking on it
+  ;;       enables calculation, which is restricted to that polygon
+  ;; :lines - in :draw click-mode, lines are drawn independently of each other
+  ;;        and have a different color from current or finished polygons
+  ;;        - in :calculate mode a free line (not in a polygon) must be
+  ;;          selected to enable calculation - which labels the other free lines
+  :mode :polygons
   ;; click-mode - either :draw or :calculate
-  ;; what happens when you click on the image
+  ;;    what happens when you click on the image
   ;; :draw - click and drag to create the :current-polygon
   ;;     once finished, :current-polygon goes to :polygons
   ;; :calculate - if there is at least one polygon in :polygons

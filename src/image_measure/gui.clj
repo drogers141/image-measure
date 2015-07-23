@@ -187,13 +187,15 @@
   "Set initial selections as needed - triggers state update.
    root - root component
    returns root"
-  (let [draw-radio (sc/select root [:#draw-radio])
+  (let [polygons-radio (sc/select root [:#polygons-radio])
+        draw-radio (sc/select root [:#draw-radio])
         width (sc/select root [:#stroke])
         area-txt (sc/select root [:#area-input])
         line-txt (sc/select root [:#line-length-input])
         ;; leaving for now - see commented out section in create-gui
 ;        color (sc/select root [:#foreground])
         ]
+    (sc/config! polygons-radio :selected? true)
     (sc/config! draw-radio :selected? true)
     (sc/selection! width 5)
     (sc/config! area-txt :text "")
@@ -310,7 +312,8 @@
    ** MANIPULATES GLOBAL STATE: @state/state **"
   ;; Swing native look and feel
   (sc/native!)
-  (let [click-mode-group (sc/button-group)
+  (let [mode-group (sc/button-group)
+        click-mode-group (sc/button-group)
         gui (sc/frame
             :title "Calculate Distances or Area"
             :on-close :exit
@@ -319,7 +322,10 @@
             (sc/border-panel :hgap 5 :vgap 5 :border 5
                          :north (sc/toolbar
                            :floatable? false
-                           :items [(sc/radio :id :draw-radio :text "Draw" :selected? true :group click-mode-group)
+                           :items [(sc/radio :text "Lines" :group mode-group)
+                                   (sc/radio :id :polygons-radio :text "Polygons" :selected? true :group mode-group)
+                                   :separator
+                                   (sc/radio :id :draw-radio :text "Draw" :selected? true :group click-mode-group)
                                    (sc/radio :text "Calculate" :group click-mode-group)
                                    :separator
                                    "Area"
@@ -353,6 +359,11 @@
           (if (= "Draw" (sc/text (sc/selection click-mode-group)))
             (swap! state/state assoc :click-mode :draw)
             (swap! state/state assoc :click-mode :calculate))))
+    (sc/listen mode-group :action
+        (fn [e]
+          (if (= "Polygons" (sc/text (sc/selection mode-group)))
+            (swap! state/state assoc :mode :polygons)
+            (swap! state/state assoc :mode :lines))))
     gui))
 
 (defn run-gui [image-file]
