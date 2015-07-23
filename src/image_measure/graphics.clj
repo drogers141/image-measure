@@ -201,27 +201,34 @@
      (vec (map first (filter (fn [[_ v]] (= 1 v)) counts)))))
 
 (defn start-new-line [state e]
-  "Start a new line - if there is a current polygon a new line can only
+  "Start a new line.
+   If in polygon mode and there is a current polygon a new line can only
    be started from one of its endpoints."
   (let [p (.getPoint e)]
-    (do
-      ;; if current poly - line must start from an endpoint
-      (if (and (state :current-polygon) (pos? (count (state :current-polygon))))
-          (let [endpts (end-points state (state :current-polygon))
-                close-pt (first (filter #(points-close-enough p %) endpts))]
-            (log/info "** start-new-line: current polygon **")
-            (log/info "endpts: " endpts "\nclose-pt: " close-pt)
-;            (println "endpts: " endpts "\nclose-pt: " close-pt)
-            (if close-pt
-              (assoc state
-                     :start-point [(.x close-pt) (.y close-pt)]
-                     :current-line [(sg/line (.x close-pt) (.y close-pt)
-                                             (.x close-pt) (.y close-pt))
-                                    (:style state)])
-              state))
-          (assoc state
-             :start-point [(.x p) (.y p)]
-             :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))))
+    (if (= (state :mode) :polygons)
+      ;; polygon mode
+      (do
+        ;; if current poly - line must start from an endpoint
+        (if (and (state :current-polygon) (pos? (count (state :current-polygon))))
+            (let [endpts (end-points state (state :current-polygon))
+                  close-pt (first (filter #(points-close-enough p %) endpts))]
+              (log/info "** start-new-line: current polygon **")
+              (log/info "endpts: " endpts "\nclose-pt: " close-pt)
+  ;            (println "endpts: " endpts "\nclose-pt: " close-pt)
+              (if close-pt
+                (assoc state
+                       :start-point [(.x close-pt) (.y close-pt)]
+                       :current-line [(sg/line (.x close-pt) (.y close-pt)
+                                               (.x close-pt) (.y close-pt))
+                                      (:style state)])
+                state))
+            (assoc state
+               :start-point [(.x p) (.y p)]
+               :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)])))
+      ;; lines mode
+      (assoc state
+         :start-point [(.x p) (.y p)]
+         :current-line [(sg/line (.x p) (.y p) (.x p) (.y p)) (:style state)]))))
 
 (defn drag-new-line [state e [dx dy]]
   "New line has been started - add to it."
@@ -252,35 +259,42 @@
         new-state))))
 
 (defn finish-new-line [state e]
-  "Finish newly drawn line.  In polygon mode add it to the current polygon
-   (possibly starting/finishing the polygon)."
+  "Finish newly drawn line.
+     * In polygon mode add it to the current polygon (possibly
+        starting/finishing the polygon).
+     * In lines mode change color to free-lines color"
   (let [new-state (-> state
                     (update-in [:lines] conj (:current-line state))
                     (assoc :current-line nil)
                     (assoc :start-point nil))]
     (if (state :current-line)
-      (if (state :current-polygon)
-        (do
-          (let [updated-state (add-latest-line-to-current-polygon new-state)
-                endpts (end-points updated-state (updated-state :current-polygon))]
-            ;; close enough end points means completed polygon
-            (log/info "** finish-new-line: :current-polygon - endpts: " endpts)
-            (cond
-              (nil? endpts)
-              (do
-                (log/info "** finish-new-line: endpts nil")
-                new-state)
-              ;; end points are close enough or exact - close polygon and finish it
-              (or (zero? (count endpts)) (apply points-close-enough endpts))
-              (do
-                (log/info "** finish-new-line: finish poly - endpts: " endpts)
-                (finish-polygon (close-current-polygon updated-state)))
-              :else
-              (do
-                (log/info "** finish-new-line: add line to poly")
-                updated-state))))
-        ;; no :current-polygon so start it with this line
-        (start-new-polygon new-state))
+      (if (= (state :mode) :polygons)
+        ;; handle polygon mode
+        (if (state :current-polygon)
+          (do
+            (let [updated-state (add-latest-line-to-current-polygon new-state)
+                  endpts (end-points updated-state (updated-state :current-polygon))]
+              ;; close enough end points means completed polygon
+              (log/info "** finish-new-line: :current-polygon - endpts: " endpts)
+              (cond
+                (nil? endpts)
+                (do
+                  (log/info "** finish-new-line: endpts nil")
+                  new-state)
+                ;; end points are close enough or exact - close polygon and finish it
+                (or (zero? (count endpts)) (apply points-close-enough endpts))
+                (do
+                  (log/info "** finish-new-line: finish poly - endpts: " endpts)
+                  (finish-polygon (close-current-polygon updated-state)))
+                :else
+                (do
+                  (log/info "** finish-new-line: add line to poly")
+                  updated-state))))
+          ;; no :current-polygon so start it with this line
+          (start-new-polygon new-state))
+        ;; handle lines mode
+        (let [c (state :free-lines-color)]
+          (change-line-color new-state (dec (count (new-state :lines))) c)))
       ;; no current-line being drawn - no-op
       state)))
 

@@ -46,6 +46,9 @@
   :current-polygon-color nil
   ;; color of lines in finished polygons that you can select for calculation
   :finished-polygon-color (color/color 0 216 0)
+  ;; color of finished lines not associated with a polygon
+  ;; (drawn in :lines mode)
+  :free-lines-color (color/color 255 0 255)
   ;; mode - either :lines or :polygons
   ;;    what happens when you draw or click the calculate button
   ;; :polygons - in :draw click-mode all lines drawn are part of the
