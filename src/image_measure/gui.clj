@@ -90,6 +90,24 @@
     (swap! state/state g/label-poly-for-calculation g index)
     (sc/repaint! root)))
 
+(defn set-free-lines-for-calculation [root index]
+  "Setup free-lines for calculation
+     * disable area and line selection
+     * enable line length textbox
+     * label selected free line with Selected
+   index - index of selected free line in state"
+  (let [g (.getGraphics root)
+        area-txt (sc/select root [:#area-input])
+        line-select (sc/select root [:#line-select])
+        line-txt (sc/select root [:#line-length-input])
+        calculate-btn (sc/select root [:#calculate-btn])]
+    (sc/config! area-txt :enabled? false)
+    (sc/config! line-select :enabled? false)
+    (sc/config! line-txt :enabled? true)
+    (sc/config! calculate-btn :enabled? true)
+    (swap! state/state g/label-free-lines-for-calculation g index)
+    (sc/repaint! root)))
+
 (defn calculate-line-lengths [indices line length]
   "indices - line indices
    line - index of known line
@@ -114,6 +132,14 @@
         pixel-len (.distance (line-pts 0) (line-pts 1))
         scale (/ length pixel-len)]
     (* area (* scale scale))))
+
+(defn calculate-free-line-lengths [line-index length]
+  "Calculates length of all free-lines in state/state given the length
+   of one line.
+   Returns map {0 1 ..} with the length of each line keyed to its index.
+   ** Access global state: state/state **"
+  (let [indices (g/free-lines @state/state)]
+    (calculate-line-lengths indices line-index length)))
 
 (defn calculate-from-length [poly-index line-index length]
   "Calculates area of polygon and length of all lines given the length
@@ -214,6 +240,66 @@
   (init-selections! root)
   (sc/repaint! root))
 
+(defn handle-calculate-btn [actevent]
+ (let [area-txt (sc/select root [:#area-input])
+       line-select (sc/select root [:#line-select])
+       line-txt (sc/select root [:#line-length-input])
+       area (sc/config area-txt :text)
+       line (sc/selection line-select)
+       line-len (sc/config line-txt :text)
+       poly-index (@state/state :selected-polygon)
+       imgicon (sc/select root [:#image-label])
+       g (.getGraphics root)]
+   (if (= :polygons (@state/state :mode))
+     (cond
+       (and (pos? (count area)) (pos? (count line-len)))
+       (sc/alert "Can only calculate based on area or the length of a line. Not both.")
+       (pos? (count line-len))
+       (when (numeric-input? line-len)
+         (let [results (calculate-from-length poly-index line
+                                              (Double/parseDouble line-len))]
+           (swap! state/state g/label-poly-with-results g poly-index results)
+           (sc/config! line-txt :text "")
+           (sc/repaint! imgicon)))
+       (pos? (count area))
+       (when (numeric-input? area)
+         (let [results (calculate-from-area poly-index
+                                            (Double/parseDouble area))]
+           (swap! state/state g/label-poly-with-results g poly-index results)
+           (sc/config! area-txt :text "")
+           (sc/repaint! imgicon))))
+     ;; lines mode
+     (when (numeric-input? line-len)
+       (let [results (calculate-free-line-lengths (@state/state :selected-free-line)
+                                                  (Double/parseDouble line-len))]
+         (swap! state/state g/label-free-lines-with-results g results)
+         (sc/config! line-txt :text "")
+         (sc/repaint! imgicon))))))
+
+;; simple click selects polygon in :polygons mode, :calculate click-mode
+;; selects a free line in :lines mode, :calculate click-mode
+;; note - have the assignment of selected-polygon or selected-free-line
+;; within the when clauses below - this way clicking something else or
+;; nothing does not deselect the polygon or free-line -
+;; user has to select another free-line or polygon to change selection
+;; may want to change, but seems safer this way given current setup
+(defn handle-mouse-clicked [e]
+ (when (= :calculate (@state/state :click-mode))
+   (if (= :polygons (@state/state :mode))
+     (let [selected-poly (g/find-polygon @state/state (.getX e) (.getY e))]
+       (println "click: (" (.getX e) ", " (.getY e) ")")
+       (println "selecting polygon: " selected-poly)
+       (when selected-poly
+         (swap! state/state assoc :selected-polygon selected-poly)
+         (set-poly-for-calculation! root selected-poly)))
+     ;; is :lines mode
+     (let [selected-line (g/find-free-line @state/state (.getX e) (.getY e))]
+       (println "click: (" (.getX e) ", " (.getY e) ")")
+       (println "selecting free line: " selected-line)
+       (swap! state/state assoc :selected-free-line selected-line)
+       (when selected-line
+         (swap! state/state assoc :selected-free-line selected-line)
+         (set-free-lines-for-calculation root selected-line))))))
 
 (defn add-behaviors [root]
   "Add functionality to widgets using Seesaw's selection.
@@ -224,9 +310,6 @@
         clear-all-btn (sc/select root [:#clear-all-btn])
         delete-last-btn (sc/select root [:#delete-last-btn])
         calculate-btn (sc/select root [:#calculate-btn])
-        area-txt (sc/select root [:#area-input])
-        line-select (sc/select root [:#line-select])
-        line-txt (sc/select root [:#line-length-input])
         ]
     (sc/listen clear-all-btn
                :action (fn [actevent]
@@ -236,46 +319,16 @@
                           (swap! state/state g/delete-last-line)
                           (sc/repaint! imgicon)))
     (sc/listen calculate-btn
-               :action (fn [e]
-                         (let [area (sc/config area-txt :text)
-                               line (sc/selection line-select)
-                               line-len (sc/config line-txt :text)
-                               poly-index (@state/state :selected-polygon)
-                               g (.getGraphics root)]
-                           (cond
-                             (and (pos? (count area)) (pos? (count line-len)))
-                             (sc/alert "Can only calculate based on area or the length of a line. Not both.")
-                             (pos? (count line-len))
-                             (when (numeric-input? line-len)
-                               (let [results (calculate-from-length poly-index line
-                                                                    (Double/parseDouble line-len))]
-                                 (swap! state/state g/label-poly-with-results g poly-index results)
-                                 (sc/config! line-txt :text "")
-                                 (sc/repaint! imgicon)))
-                             (pos? (count area))
-                             (when (numeric-input? area)
-                               (let [results (calculate-from-area poly-index
-                                                                  (Double/parseDouble area))]
-                                 (swap! state/state g/label-poly-with-results g poly-index results)
-                                 (sc/config! area-txt :text "")
-                                 (sc/repaint! imgicon)))))))
-
+               :action handle-calculate-btn)
     (sc/listen styles :selection #(swap! state/state g/update-line-style %))
     ;; click and drag applies in :draw :click-mode
     (behave/when-mouse-dragged imgicon
       :start (dispatch g/start-new-line)
       :drag  (dispatch g/drag-new-line)
       :finish (dispatch g/finish-new-line))
-    ;; simple click selects polygon in :calculate :click-mode
-    (sc/listen imgicon :mouse-clicked
-               (fn [e]
-                 (when (= :calculate (@state/state :click-mode))
-                   (do
-                     (let [selected-poly (g/find-polygon @state/state (.getX e) (.getY e))]
-                     (println "click: (" (.getX e) ", " (.getY e) ")")
-                     (println "selecting polygon: " selected-poly)
-                     (swap! state/state assoc :selected-polygon selected-poly)
-                     (set-poly-for-calculation! root selected-poly))))))
+
+    (sc/listen imgicon :mouse-clicked handle-mouse-clicked)
+
     ;; add mouse coords to label in bottom panel
     (sc/listen imgicon :mouse-moved
                (fn [e]

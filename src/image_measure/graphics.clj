@@ -3,6 +3,7 @@
    lines and polygons."
  (:require [clojure.java.io :as io]
            [clojure.string :as str]
+           [clojure.set :as set]
            [clojure.pprint :refer [pprint]]
            [clojure.tools.logging :as log]
            [seesaw.core :as sc]
@@ -70,6 +71,14 @@
   (str/join "\n" (for [l (state :lines)]
     (str/join "<->" (map #(format "(%s, %s)" (int (.getX %)) (int (.getY %)))
                          (get-points (l 0)))))))
+
+(defn free-lines [state]
+  "Returns vector of indices of lines not associated with any polygon.
+   Always returns vector."
+  (let [in-a-poly (set (concat (flatten (state :polygons))
+                               (state :current-polygon)))
+        all-lines (set (range (count (state :lines))))]
+   (vec (set/difference all-lines in-a-poly))))
 
 ;; drawing utilities for lines and points
 
@@ -333,6 +342,14 @@
         width (.getLineWidth stroke)]
     (.intersects l (- x width) (- y width) (* 2 width) (* 2 width))))
 
+(defn find-free-line [state x y]
+  "If the point (x, y) is on a line not associated with a polygon in state,
+   the index of the line is returned.  Otherwise nil.
+   Tolerance is determined by the lines and points themselves (stroke, etc)."
+  (let [free (free-lines state)
+        found #(line-intersects state % x y)]
+    (first (filter found free))))
+
 (defn find-polygon [state x y]
   "If the point (x, y) is on a line or point defining a polygon in state,
    the index of the polygon in :polygons is returned.  Otherwise nil.
@@ -444,6 +461,14 @@
           (recur (label-line s g i l) (rest rem-lines)))
         s))))
 
+(defn label-free-lines-for-calculation [state ^java.awt.Graphics2D g index]
+  "index - index of selected line in state
+   Clears all free-lines of labels and labels selected line."
+  (let [free (free-lines state)
+        l (label 0 0 18 "Selected")
+        state1 (reduce remove-line-label state free)]
+    (label-line state1 g index l)))
+
 (defn label-poly-with-results [state ^java.awt.Graphics2D g index results]
   "Label polygon with results of calculating lengths and area.
    index - index of poly
@@ -456,6 +481,22 @@
         polylabel (make-label (results :area))
         state1 (label-poly-center state g index polylabel)]
     (loop [s state1
+           rem-lines lines]
+      (if (seq rem-lines)
+        (let [i (first rem-lines)
+              l (make-label (results i))]
+          (recur (label-line s g i l) (rest rem-lines)))
+        s))))
+
+(defn label-free-lines-with-results [state ^java.awt.Graphics2D g results]
+  "Label all free-lines with results of calculating lengths.
+   results - map with results of calculation in form
+     {index1 <length-line1> index2 <length-line2>}
+   ** Formatting with single digit precision for now **
+   ** Defaulting to 18 as fontsize for now as well **"
+  (let [lines (free-lines state)
+        make-label (fn [val] (label 0 0 18 (format "%.1f" val)))]
+    (loop [s state
            rem-lines lines]
       (if (seq rem-lines)
         (let [i (first rem-lines)

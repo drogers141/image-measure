@@ -13,7 +13,7 @@
   (->> ["Calculate distances/lengths and area in images using drawn lines and"
         "polygons."
         ""
-        "Usage: image-measure [options] image-file"
+        "Usage: image-measure [options] [image-file]"
         ""
         "Options:"
         options-summary
@@ -21,7 +21,9 @@
         "image-file"
         "Full path to image file to work with."
         "Note gui cannot resize image.  Recommended to work with images at"
-        "least 800 px wide for clarity of labeling, etc."]
+        "least 800 px wide for clarity of labeling, etc."
+        "If image-file is not provided, program is run with image used in the"
+        "Readme examples."]
        (str/join \newline)))
 
 (defn error-msg [errors]
@@ -36,8 +38,14 @@
   (let [{:keys [options arguments errors summary]} (parse-opts args cli-options)]
     (cond
       (:help options) (exit 0 (usage summary))
-      (not= 1 (count arguments)) (exit 1 (usage summary))
-      errors (exit 1 (error-msg errors)))
-    (do
-      (println "arguments:" arguments)
-      (gui/-main (arguments 0)))))
+
+      (not= 1 (count arguments))
+      (gui/-main (io/file (io/resource "floorplan.jpg")))
+
+      errors (exit 1 (error-msg errors))
+
+      :else
+      (let [f (io/file (arguments 0))]
+        (if (.isFile f)
+          (gui/-main (.getAbsolutePath f))
+          (println "File not found: " (.getName f)))))))

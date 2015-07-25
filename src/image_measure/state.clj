@@ -48,7 +48,12 @@
   :finished-polygon-color (color/color 0 216 0)
   ;; color of finished lines not associated with a polygon
   ;; (drawn in :lines mode)
-  :free-lines-color (color/color 255 0 255)
+  :free-lines-color (color/color 0 168 255)
+  ;; blue 0 128 255, 0 168 255  purple 128 0 255
+  ;; magenta 204 0 204
+  ;; selected line to give length to calculate for in :lines mode
+  :selected-free-line nil
+
   ;; mode - either :lines or :polygons
   ;;    what happens when you draw or click the calculate button
   ;; :polygons - in :draw click-mode all lines drawn are part of the
