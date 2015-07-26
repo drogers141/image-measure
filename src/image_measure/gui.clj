@@ -1,5 +1,6 @@
 (ns image-measure.gui
   (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.pprint :refer [pprint]]
             [clojure.tools.logging :as log]
             [seesaw.core :as sc]
@@ -7,11 +8,14 @@
             [seesaw.graphics :as sg]
             [seesaw.behave :as behave]
             [seesaw.bind :as bind]
+            [seesaw.chooser :as chooser]
             [image-measure.graphics :as g]
             [image-measure.state :as state]
             [image-measure.geo :as geo])
   (:import [javax.swing JFrame JPanel ImageIcon]
-           [java.awt.geom Line2D]))
+           [java.awt.geom Line2D]
+           [java.awt.image BufferedImage]
+           [javax.imageio ImageIO]))
 
 (def colors [:black :white :red :blue :yellow :green :orange :purple nil])
 
@@ -189,13 +193,14 @@
               (recur (/ len-i 2.0) nil len-hi)
               (recur (/ (+ len-lo len-hi) 2) len-lo len-hi))))))))
 
-(defn numeric-input? [val]
+(defn numeric-input? [root val]
   "Returns val as double if it can be parsed as double.
-   If non-numeric alerts user with dialog before returning false."
+   If non-numeric alerts user with dialog before returning false.
+   root - root component of gui to be dialog parent"
   (try
     (Double/parseDouble val)
     (catch NumberFormatException e
-      (sc/alert (format "\"%s\": input needs to be numeric." val))
+      (sc/alert root (format "\"%s\": input needs to be numeric." val))
       false)
     (finally false)))
 
@@ -240,7 +245,26 @@
   (init-selections! root)
   (sc/repaint! root))
 
-(defn handle-calculate-btn [actevent]
+(defn get-image-label [image-file]
+  "Returns image component of gui.
+   image-file - full path to image to work with"
+  (let [icon (ImageIcon. (io/as-url (str "file://" image-file)) "describe me")
+        label (sc/label :id :image-label :paint render)]
+    (.setIcon label icon)
+    label))
+
+(defn save-image [root outfile]
+  "Save image to File outfile.  Can only handle png so path must be *.png.
+   Does nothing and returns nil if not.  Returns true if successful."
+  (when (= "png" (last (str/split (.getName outfile) #"\.")))
+    (let [label (sc/select root [:#image-label])
+          image (BufferedImage. (.getWidth label) (.getHeight label)
+                                BufferedImage/TYPE_INT_ARGB)
+          g (.getGraphics image)]
+      (.paint label g)
+      (ImageIO/write image "png" outfile))))
+
+(defn handle-calculate-btn [root actevent]
  (let [area-txt (sc/select root [:#area-input])
        line-select (sc/select root [:#line-select])
        line-txt (sc/select root [:#line-length-input])
@@ -253,23 +277,23 @@
    (if (= :polygons (@state/state :mode))
      (cond
        (and (pos? (count area)) (pos? (count line-len)))
-       (sc/alert "Can only calculate based on area or the length of a line. Not both.")
+       (sc/alert root "Can only calculate based on area or the length of a line. Not both.")
        (pos? (count line-len))
-       (when (numeric-input? line-len)
+       (when (numeric-input? root line-len)
          (let [results (calculate-from-length poly-index line
                                               (Double/parseDouble line-len))]
            (swap! state/state g/label-poly-with-results g poly-index results)
            (sc/config! line-txt :text "")
            (sc/repaint! imgicon)))
        (pos? (count area))
-       (when (numeric-input? area)
+       (when (numeric-input? root area)
          (let [results (calculate-from-area poly-index
                                             (Double/parseDouble area))]
            (swap! state/state g/label-poly-with-results g poly-index results)
            (sc/config! area-txt :text "")
            (sc/repaint! imgicon))))
      ;; lines mode
-     (when (numeric-input? line-len)
+     (when (numeric-input? root line-len)
        (let [results (calculate-free-line-lengths (@state/state :selected-free-line)
                                                   (Double/parseDouble line-len))]
          (swap! state/state g/label-free-lines-with-results g results)
@@ -283,7 +307,7 @@
 ;; nothing does not deselect the polygon or free-line -
 ;; user has to select another free-line or polygon to change selection
 ;; may want to change, but seems safer this way given current setup
-(defn handle-mouse-clicked [e]
+(defn handle-mouse-clicked [root e]
  (when (= :calculate (@state/state :click-mode))
    (if (= :polygons (@state/state :mode))
      (let [selected-poly (g/find-polygon @state/state (.getX e) (.getY e))]
@@ -307,10 +331,20 @@
    Returns root."
   (let [imgicon (sc/select root [:#image-label])
         styles (sc/select root [:.style])
+        save-image-btn (sc/select root [:#save-image-btn])
         clear-all-btn (sc/select root [:#clear-all-btn])
         delete-last-btn (sc/select root [:#delete-last-btn])
         calculate-btn (sc/select root [:#calculate-btn])
         ]
+    (sc/listen save-image-btn
+               :action (fn [actevent]
+                         (let [outfile (chooser/choose-file root :type :save
+                                          :filters [["PNG files" ["png"]]])]
+                           (if (= "png" (last (str/split (.getName outfile) #"\.")))
+                             (save-image root outfile)
+                             (sc/alert root "Must be *.png file to save image.")))))
+
+
     (sc/listen clear-all-btn
                :action (fn [actevent]
                          (reset-state! root)))
@@ -319,7 +353,7 @@
                           (swap! state/state g/delete-last-line)
                           (sc/repaint! imgicon)))
     (sc/listen calculate-btn
-               :action handle-calculate-btn)
+               :action (partial handle-calculate-btn root))
     (sc/listen styles :selection #(swap! state/state g/update-line-style %))
     ;; click and drag applies in :draw :click-mode
     (behave/when-mouse-dragged imgicon
@@ -327,7 +361,7 @@
       :drag  (dispatch g/drag-new-line)
       :finish (dispatch g/finish-new-line))
 
-    (sc/listen imgicon :mouse-clicked handle-mouse-clicked)
+    (sc/listen imgicon :mouse-clicked (partial handle-mouse-clicked root))
 
     ;; add mouse coords to label in bottom panel
     (sc/listen imgicon :mouse-moved
@@ -337,14 +371,6 @@
                                (str "(" (.getX e) ", " (.getY e) ")")))))
     (doseq [s styles] #(swap! state/state g/update-line-style s)))
   root)
-
-(defn get-image-label [image-file]
-  "Returns image component of gui.
-   image-file - full path to image to work with"
-  (let [icon (ImageIcon. (io/as-url (str "file://" image-file)) "describe me")
-        label (sc/label :id :image-label :paint render)]
-    (.setIcon label icon)
-    label))
 
 ;; (currently unused but keeping around for now)
 ;; cell renderer - for comboboxes that list colors paints the
@@ -401,11 +427,13 @@
                           :center (get-image-label image-file)
 
                           :south (sc/horizontal-panel :id :south-panel
-                                      :items [(sc/button :id :clear-all-btn
+                                      :items [(sc/button :id :save-image-btn
+                                                         :text "Save Image")
+                                              (sc/button :id :clear-all-btn
                                                          :text "Clear All")
-                                                (sc/button :text "Delete Last Line"
-                                                           :id :delete-last-btn)
-                                                (sc/label :id :mouse-coords)])))]
+                                              (sc/button :text "Delete Last Line"
+                                                         :id :delete-last-btn)
+                                              (sc/label :id :mouse-coords)])))]
 
     (sc/listen click-mode-group :action
         (fn [e]
