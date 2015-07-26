@@ -208,6 +208,7 @@
         draw-radio (sc/select root [:#draw-radio])
         width (sc/select root [:#stroke])
         area-txt (sc/select root [:#area-input])
+        line-select (sc/select root [:#line-select])
         line-txt (sc/select root [:#line-length-input])
         ;; leaving for now - see commented out section in create-gui
 ;        color (sc/select root [:#foreground])
@@ -215,8 +216,9 @@
     (sc/config! polygons-radio :selected? true)
     (sc/config! draw-radio :selected? true)
     (sc/selection! width 5)
-    (sc/config! area-txt :text "")
-    (sc/config! line-txt :text "")
+    (sc/config! area-txt :text "" :enabled? false)
+    (sc/config! line-txt :text "" :enabled? false)
+    (sc/config! line-select :enabled? false)
 ;    (sc/selection! color :red)
     ;; hard set foreground drawing color to red
     ;; replace if we go back to giving color choice
@@ -319,6 +321,7 @@
         styles (sc/select root [:.style])
         save-image-btn (sc/select root [:#save-image-btn])
         clear-all-btn (sc/select root [:#clear-all-btn])
+        clear-labels-btn (sc/select root [:#clear-labels-btn])
         delete-last-btn (sc/select root [:#delete-last-btn])
         calculate-btn (sc/select root [:#calculate-btn])
         ]
@@ -329,11 +332,13 @@
                            (if (= "png" (last (str/split (.getName outfile) #"\.")))
                              (save-image root outfile)
                              (sc/alert root "Must be *.png file to save image.")))))
-
-
     (sc/listen clear-all-btn
                :action (fn [actevent]
                          (reset-state! root)))
+    (sc/listen clear-labels-btn
+               :action (fn [actevent]
+                         (swap! state/state assoc :labels [])
+                         (sc/repaint! imgicon)))
     (sc/listen delete-last-btn
                :action (fn [actevent]
                           (swap! state/state g/delete-last-line)
@@ -417,6 +422,8 @@
                                                          :text "Save Image")
                                               (sc/button :id :clear-all-btn
                                                          :text "Clear All")
+                                              (sc/button :id :clear-labels-btn
+                                                         :text "Clear Labels")
                                               (sc/button :text "Delete Last Line"
                                                          :id :delete-last-btn)
                                               (sc/label :id :mouse-coords)])))]
