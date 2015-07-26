@@ -39,36 +39,22 @@
    c - component
    g - graphics context
   "
-  (let [{:keys [lines current-line labels]} @state/state
-        label (g/->Label 445 195 18 "3.14159" (sclr/color :black) (sclr/color :white))
-        clabel (g/->Label 523 294 18 "3.14159" (sclr/color :black) (sclr/color :white))]
+  (let [{:keys [lines current-line labels]} @state/state]
     ;; draw line segments of full lines
     (apply sg/draw g (apply concat lines))
     ;; draw endpoints of full lines
-;    (println "lines: " (count lines))
-;    (pprint lines)
     (dorun
       (for [[l s] lines]
         (do
-;          (println "draw endpoints - " l)
           (g/draw-line-end-points l s g))))
+    ;; draw all labels over finished lines
     (dorun
       (for [{l :label} labels]
         (do
-          (g/paint-label g l)
-;          (println "painted label:" l)
-          )))
-
+          (g/paint-label g l))))
     ;; draw line segment of working line if dragging
     (when current-line
-      (apply sg/draw g current-line))
-
-;    (println (g/label-geometry g label))
-;    (g/paint-label g label)
-;    (g/paint-label g (g/centered-label g label 445.1 195.1))
-;    (g/paint-label g clabel)
-
-    ))
+      (apply sg/draw g current-line))))
 
 (defn set-poly-for-calculation! [root index]
   "Setup polygon for calculation:

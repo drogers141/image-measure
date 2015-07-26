@@ -328,9 +328,16 @@
       (if (some inpoly (state :polygons))
         state
         (let [state2 (update-in state [:lines] pop)]
-          (if (get state2 :current-polygon)
+          (cond
+            ;; if current polygon - delete line from it as well
+            (and (get state2 :current-polygon)
+                 (inpoly (state2 :current-polygon)))
             (assoc state2 :current-polygon
                    (vec (remove-first index (state :current-polygon))))
+            ;; set selected free line to nil if deleted (doesn't handle label)
+            (= index (state :selected-free-line))
+            (assoc state2 :selected-free-line nil)
+            :else
             state2))))))
 
 (defn line-intersects [state index x y]
