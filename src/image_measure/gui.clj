@@ -19,9 +19,6 @@
 
 (def colors [:black :white :red :blue :yellow :green :orange :purple nil])
 
-;; /Users/drogers/Desktop/images-craigslist/floorplan.jpg
-;; /Users/drogers/Desktop/images-craigslist/cottage.jpg
-
 (defn dispatch  [handler]
   "Returns event handler based on param that manipulates app state.
    ** ACCESSES GLOBAL STATE: @state/state **
@@ -193,7 +190,6 @@
 (defn print-state
   "Pretty print parts or all of state.  Default prints lines out in
    compact string form."
-;  ([] (pprint @state/state))
   ([] (do
         (pprint (for [k (keys @state/state) :when (not= k :lines)]
             {k (@state/state k)}))
@@ -243,7 +239,9 @@
 
 (defn save-image [root outfile]
   "Save image to File outfile.  Can only handle png so path must be *.png.
-   Does nothing and returns nil if not.  Returns true if successful."
+   Does nothing and returns nil if not.  Returns true if successful.
+   root - root component of gui
+   outfile - File instance"
   (when (= "png" (last (str/split (.getName outfile) #"\.")))
     (let [label (sc/select root [:#image-label])
           image (BufferedImage. (.getWidth label) (.getHeight label)
@@ -253,6 +251,8 @@
       (ImageIO/write image "png" outfile))))
 
 (defn handle-calculate-btn [root actevent]
+  "Calculate button handler
+   ** MANIPULATES GLOBAL STATE: @state/state **"
  (let [area-txt (sc/select root [:#area-input])
        line-select (sc/select root [:#line-select])
        line-txt (sc/select root [:#line-length-input])
@@ -309,13 +309,6 @@
          (sc/alert root (str "No scaled lengths calculated from polygons"
                              "or selected line length given.")))))))
 
-;       when (numeric-input? root line-len)
-;       (let [results (calculate-free-line-lengths (@state/state :selected-free-line)
-;                                                  (Double/parseDouble line-len))]
-;         (swap! state/state g/label-free-lines-with-results g results)
-;         (sc/config! line-txt :text "")
-;         (sc/repaint! imgicon))))))
-
 ;; simple click selects polygon in :polygons mode, :calculate click-mode
 ;; selects a free line in :lines mode, :calculate click-mode
 ;; note - have the assignment of selected-polygon or selected-free-line
@@ -324,6 +317,8 @@
 ;; user has to select another free-line or polygon to change selection
 ;; may want to change, but seems safer this way given current setup
 (defn handle-mouse-clicked [root e]
+  "Mouse click handler - see add-behaviors for click/drag
+   ** ACCESSES GLOBAL STATE: @state/state **"
  (when (= :calculate (@state/state :click-mode))
    (if (= :polygons (@state/state :mode))
      (let [selected-poly (g/find-polygon @state/state (.getX e) (.getY e))]
