@@ -271,6 +271,8 @@
          (let [results (calculate-from-length poly-index line
                                               (Double/parseDouble line-len))]
            (swap! state/state g/label-poly-with-results g poly-index results)
+           (swap! state/state assoc :latest-calculated-lines
+                  (dissoc results :area))
            (sc/config! line-txt :text "")
            (sc/repaint! imgicon)))
        (pos? (count area))
@@ -278,15 +280,41 @@
          (let [results (calculate-from-area poly-index
                                             (Double/parseDouble area))]
            (swap! state/state g/label-poly-with-results g poly-index results)
+           (swap! state/state assoc :latest-calculated-lines
+                  (dissoc results :area))
            (sc/config! area-txt :text "")
            (sc/repaint! imgicon))))
      ;; lines mode
-     (when (numeric-input? root line-len)
-       (let [results (calculate-free-line-lengths (@state/state :selected-free-line)
-                                                  (Double/parseDouble line-len))]
-         (swap! state/state g/label-free-lines-with-results g results)
-         (sc/config! line-txt :text "")
-         (sc/repaint! imgicon))))))
+     (let [handle-lines (fn [line-index length]
+                          (let [results (calculate-free-line-lengths
+                                          line-index length)]
+                             (swap! state/state
+                                    g/label-free-lines-with-results g results)
+                             (sc/config! line-txt :text "")
+                             (sc/repaint! imgicon)))]
+       (cond
+         ;; no length given, but have polygons calculated
+         ;; use max length from calculated lines in state
+         (and (zero? (count line-len))
+              (pos? (count (@state/state :latest-calculated-lines))))
+         (let [calculated (@state/state :latest-calculated-lines)
+               maxlen (apply max (vals calculated))
+               line (first (for [[k v] calculated :when (= v maxlen)] k))]
+           (handle-lines line maxlen))
+         ;; line length given for selected free line
+         (numeric-input? root line-len)
+         (handle-lines (@state/state :selected-free-line)
+                       (Double/parseDouble line-len))
+         :else
+         (sc/alert root (str "No scaled lengths calculated from polygons"
+                             "or selected line length given.")))))))
+
+;       when (numeric-input? root line-len)
+;       (let [results (calculate-free-line-lengths (@state/state :selected-free-line)
+;                                                  (Double/parseDouble line-len))]
+;         (swap! state/state g/label-free-lines-with-results g results)
+;         (sc/config! line-txt :text "")
+;         (sc/repaint! imgicon))))))
 
 ;; simple click selects polygon in :polygons mode, :calculate click-mode
 ;; selects a free line in :lines mode, :calculate click-mode

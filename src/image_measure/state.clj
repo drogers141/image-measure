@@ -53,6 +53,10 @@
   ;; magenta 204 0 204
   ;; selected line to give length to calculate for in :lines mode
   :selected-free-line nil
+  ;; scaled lengths of most recently calculated lines from polygons
+  ;; - enables automatic calculation of free-lines
+  ;; line index is key, scaled length is val
+  :latest-calculated-lines {}
 
   ;; mode - either :lines or :polygons
   ;;    what happens when you draw or click the calculate button
