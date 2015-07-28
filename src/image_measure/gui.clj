@@ -233,7 +233,6 @@
   "Returns image component of gui.
    image-url - java.net.URL of image to work with"
   (let [icon (ImageIcon. image-url "Main image")
-;        icon (ImageIcon. (io/as-url (str "file://" image-file)) "describe me")
         label (sc/label :id :image-label :paint render)]
     (.setIcon label icon)
     label))
@@ -332,7 +331,6 @@
      (let [selected-line (g/find-free-line @state/state (.getX e) (.getY e))]
        (log/debug "click: (" (.getX e) ", " (.getY e) ")")
        (log/debug "selecting free line: " selected-line)
-       (swap! state/state assoc :selected-free-line selected-line)
        (when selected-line
          (swap! state/state assoc :selected-free-line selected-line)
          (set-free-lines-for-calculation root selected-line))))))
