@@ -26,7 +26,7 @@
    handler - function (f [state event]) -> new-state"
   (fn [event & args]
     (when (and handler (= (@state/state :click-mode) :draw))
-;      (log/info "dispatch: handler: " handler "event: " event)
+;      (log/debug "dispatch: handler: " handler "event: " event)
       (apply swap! state/state handler event args)
       (sc/repaint! (sc/select (sc/to-root event) [:#image-label])))))
 
@@ -229,10 +229,11 @@
   (init-selections! root)
   (sc/repaint! root))
 
-(defn get-image-label [image-file]
+(defn get-image-label [image-url]
   "Returns image component of gui.
-   image-file - full path to image to work with"
-  (let [icon (ImageIcon. (io/as-url (str "file://" image-file)) "describe me")
+   image-url - java.net.URL of image to work with"
+  (let [icon (ImageIcon. image-url "Main image")
+;        icon (ImageIcon. (io/as-url (str "file://" image-file)) "describe me")
         label (sc/label :id :image-label :paint render)]
     (.setIcon label icon)
     label))
@@ -322,15 +323,15 @@
  (when (= :calculate (@state/state :click-mode))
    (if (= :polygons (@state/state :mode))
      (let [selected-poly (g/find-polygon @state/state (.getX e) (.getY e))]
-       (println "click: (" (.getX e) ", " (.getY e) ")")
-       (println "selecting polygon: " selected-poly)
+       (log/debug "click: (" (.getX e) ", " (.getY e) ")")
+       (log/debug "selecting polygon: " selected-poly)
        (when selected-poly
          (swap! state/state assoc :selected-polygon selected-poly)
          (set-poly-for-calculation! root selected-poly)))
      ;; is :lines mode
      (let [selected-line (g/find-free-line @state/state (.getX e) (.getY e))]
-       (println "click: (" (.getX e) ", " (.getY e) ")")
-       (println "selecting free line: " selected-line)
+       (log/debug "click: (" (.getX e) ", " (.getY e) ")")
+       (log/debug "selecting free line: " selected-line)
        (swap! state/state assoc :selected-free-line selected-line)
        (when selected-line
          (swap! state/state assoc :selected-free-line selected-line)
@@ -399,9 +400,9 @@
                   :foreground (if (= :white value) :black :white))
     (sc/config! this :text "None")))
 
-(defn make-gui [image-file]
+(defn make-gui [image-url]
   "Constructs and returns the jframe gui.
-   image-file - full path to image to work with
+   image-url - java.net.URL of image to work with
    ** MANIPULATES GLOBAL STATE: @state/state **"
   ;; Swing native look and feel
   (sc/native!)
@@ -438,7 +439,7 @@
 ;                                   (sc/combobox :id :foreground :class :style :model colors :renderer color-cell)
                                    ])
                           ; Create the drawing surface over an image held by an image label
-                          :center (get-image-label image-file)
+                          :center (get-image-label image-url)
 
                           :south (sc/horizontal-panel :id :south-panel
                                       :items [(sc/button :id :save-image-btn
@@ -463,18 +464,18 @@
             (swap! state/state assoc :mode :lines))))
     gui))
 
-(defn run-gui [image-file]
+(defn run-gui [image-url]
   "Entry point that returns gui reference.
-   image-file - full path to image to work with
+   image-url - java.net.URL of image to work with
    ** ACCESSES GLOBAL STATE: @state/state **"
-  (let [gui (make-gui image-file)]
+  (let [gui (make-gui image-url)]
     (reset! state/state (state/clean-state))
     (sc/config! gui :on-close :dispose)
     (sc/invoke-later
       (-> gui add-behaviors init-selections! sc/pack! sc/show!))
     gui))
 
-(defn -main [image-file]
-  "image-file - full path to image to work with"
+(defn -main [image-url]
+  "image-url - java.net.URL of image to work with"
   (sc/invoke-later
-    (-> (make-gui image-file) add-behaviors init-selections! sc/pack! sc/show!)))
+    (-> (make-gui image-url) add-behaviors init-selections! sc/pack! sc/show!)))

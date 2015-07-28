@@ -25,11 +25,6 @@
   "Returns indices in collection coll of elements that satisfy predicate pred."
   (keep-indexed #(when (pred %2) %1) coll))
 
-;(defmacro print-debug [x & vars]
-;  "prints name of vars with values"
-;  `(println (format "%s: %s" `'x ~x)))
-
-
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;
 ;; Application State passed as param to these functions is a map
@@ -119,7 +114,7 @@
 (defn start-new-polygon [state]
   "Returns new state with last line in state being first line in
    :current-polygon"
-  (log/info "** start-new-polygon **")
+  (log/debug "** start-new-polygon **")
   (assoc state :current-polygon [(dec (count (state :lines)))]))
 
 (defn add-latest-line-to-current-polygon [state]
@@ -168,10 +163,6 @@
     (if (not (seq remaining))
       ordered
       (let [[new-ordered new-remaining] (select-next state true ordered remaining)]
-;        (println "ordered: " ordered "\nremaining: " remaining)
-;        (if (not= (count new-ordered) (count ordered))
-;          (println "forward")
-;          (println "reverse"))
         (if (not= (count new-ordered) (count ordered))
           (recur new-ordered new-remaining)
           (let [[new-o new-r] (select-next state false ordered remaining)]
@@ -221,9 +212,8 @@
         (if (and (state :current-polygon) (pos? (count (state :current-polygon))))
             (let [endpts (end-points state (state :current-polygon))
                   close-pt (first (filter #(points-close-enough p %) endpts))]
-              (log/info "** start-new-line: current polygon **")
-              (log/info "endpts: " endpts "\nclose-pt: " close-pt)
-  ;            (println "endpts: " endpts "\nclose-pt: " close-pt)
+              (log/debug "** start-new-line: current polygon **")
+              (log/debug "endpts: " endpts "\nclose-pt: " close-pt)
               (if close-pt
                 (assoc state
                        :start-point [(.x close-pt) (.y close-pt)]
@@ -284,20 +274,20 @@
             (let [updated-state (add-latest-line-to-current-polygon new-state)
                   endpts (end-points updated-state (updated-state :current-polygon))]
               ;; close enough end points means completed polygon
-              (log/info "** finish-new-line: :current-polygon - endpts: " endpts)
+              (log/debug "** finish-new-line: :current-polygon - endpts: " endpts)
               (cond
                 (nil? endpts)
                 (do
-                  (log/info "** finish-new-line: endpts nil")
+                  (log/debug "** finish-new-line: endpts nil")
                   new-state)
                 ;; end points are close enough or exact - close polygon and finish it
                 (or (zero? (count endpts)) (apply points-close-enough endpts))
                 (do
-                  (log/info "** finish-new-line: finish poly - endpts: " endpts)
+                  (log/debug "** finish-new-line: finish poly - endpts: " endpts)
                   (finish-polygon (close-current-polygon updated-state)))
                 :else
                 (do
-                  (log/info "** finish-new-line: add line to poly")
+                  (log/debug "** finish-new-line: add line to poly")
                   updated-state))))
           ;; no :current-polygon so start it with this line
           (start-new-polygon new-state))

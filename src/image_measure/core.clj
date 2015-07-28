@@ -19,7 +19,7 @@
         options-summary
         ""
         "image-file"
-        "Full path to image file to work with."
+        "Path to image file to work with."
         "Note gui cannot resize image.  Recommended to work with images at"
         "least 800 px wide for clarity of labeling, etc."
         "If image-file is not provided, program is run with image used in the"
@@ -40,12 +40,12 @@
       (:help options) (exit 0 (usage summary))
 
       (not= 1 (count arguments))
-      (gui/-main (io/file (io/resource "floorplan.jpg")))
+      (gui/-main (io/resource "floorplan.jpg"))
 
       errors (exit 1 (error-msg errors))
 
       :else
       (let [f (io/file (arguments 0))]
         (if (.isFile f)
-          (gui/-main (.getAbsolutePath f))
+          (gui/-main (io/as-url (.toURI f)))
           (println "File not found: " (.getName f)))))))
