@@ -1,4 +1,6 @@
 (ns image-measure.gui
+  "Construction and execution of gui as well as calculations that rely on gui
+   context."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.pprint :refer [pprint]]

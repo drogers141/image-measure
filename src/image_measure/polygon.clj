@@ -2,15 +2,12 @@
   "Polygon utilities.
    Polygons are defined as a vector of line indices in the application state
    map.
-   See graphics.clj for lower level graphics functionality and state.clj for an
+   See graphics_low.clj for lower level graphics functionality and state.clj for an
    idea of the application state being passed around."
   (:require [clojure.tools.logging :as log]
-           [seesaw.core :as sc]
-           [seesaw.color :as sclr]
            [seesaw.graphics :as sg]
-           [image-measure.geo :as geo]
            [image-measure.util :as util]
-           [image-measure.graphics :as graphics]))
+           [image-measure.graphics-low :as graphics]))
 
 (defn start-new-polygon [state]
   "Returns new state with last line in state being first line in
