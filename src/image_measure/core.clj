@@ -1,4 +1,5 @@
 (ns image-measure.core
+  "Entry point to command line invocation of the application."
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.tools.cli :refer [parse-opts]]
