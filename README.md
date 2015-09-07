@@ -16,8 +16,10 @@ Options:
 
 image-file:
     Path to image file to work with.
-    Note gui cannot resize image.  Recommended to work with images at least 800 px wide for clarity of labeling, etc.
-    If image-file is not provided, program is run with image used in the examples below.
+    Note gui cannot resize image.  Recommended to work with images at least 800
+    px wide for clarity of labeling, etc.
+    If image-file is not provided, program is run with image used in the
+    examples below.
 ```
 
 ## Intro/Tutorial
@@ -119,10 +121,8 @@ Now I click calculate and get similar results from the area-based calculation.
 
 ![Image not available..)] (doc/tut-11.jpg)
 
-Note their are differences, since we are estimating based off of drawn lines, but
+Note there are differences, since we are estimating based off of drawn lines, but
 the measurements are quite close.
-
-
 
 ## License
 
